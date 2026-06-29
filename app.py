@@ -350,12 +350,18 @@ def fetch_all_stock_prices(symbols):
 def stock_recommend(stock, price_data):
     cost = float(stock.get("avg_cost") or 0)
     qty  = float(stock.get("qty")      or 0)
+    invested = round(cost * qty, 2)
 
     if not price_data:
+        # No live price — fall back to Groww's own closing values
+        groww_curr = float(stock.get("groww_current_value") or 0)
+        groww_pnl  = float(stock.get("groww_pnl") or 0)
+        pnl_pct    = round(groww_pnl / invested * 100, 2) if invested > 0 else 0
         return {
             "status": "NO DATA", "color": "secondary", "icon": "❓",
-            "action": "Could not fetch live price — verify the NSE symbol.",
-            "pnl_pct": 0, "pnl_abs": 0, "invested": 0, "current_value": 0, "range_pct": 0,
+            "action": "Live price unavailable — showing Groww closing values.",
+            "pnl_pct": pnl_pct, "pnl_abs": round(groww_pnl, 2),
+            "invested": invested, "current_value": groww_curr, "range_pct": 0,
         }
 
     current   = price_data["current_price"]
