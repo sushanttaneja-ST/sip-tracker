@@ -625,7 +625,7 @@ def recommend(sip, perf):
 
 
 # ---------------------------------------------------------------------------
-# Groww Excel parser
+# Groww MF Excel parser
 # ---------------------------------------------------------------------------
 
 def parse_groww_excel(file_bytes):
@@ -716,6 +716,101 @@ def parse_groww_excel(file_bytes):
         funds.append(fund)
 
     return funds
+
+
+# ---------------------------------------------------------------------------
+# Groww Stocks/Equity Excel parser
+# ---------------------------------------------------------------------------
+
+def parse_groww_stocks_excel(file_bytes):
+    """Parse Groww equity holdings .xlsx and return list of stock dicts."""
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+    except Exception as e:
+        raise ValueError(f"Cannot open Excel file: {e}")
+
+    ws = wb.active
+
+    # Find the header row — look for any row with stock-like column keywords
+    HEADER_KEYWORDS = ['symbol', 'script', 'company', 'isin', 'quantity', 'qty']
+    header_row_idx = None
+    for i, row in enumerate(ws.iter_rows(values_only=True), 1):
+        cells = [str(c).strip().lower() for c in row if c]
+        if any(any(kw in c for kw in HEADER_KEYWORDS) for c in cells):
+            header_row_idx = i
+            break
+
+    if not header_row_idx:
+        raise ValueError(
+            "Could not find a header row. Make sure this is a Groww equity/stocks export."
+        )
+
+    headers = [str(ws.cell(header_row_idx, j).value or '').strip()
+               for j in range(1, ws.max_column + 1)]
+
+    def find_col(candidates):
+        """Return 0-based index of first header matching any candidate string."""
+        for c in candidates:
+            for i, h in enumerate(headers):
+                if h and c.lower() in h.lower():
+                    return i
+        return None
+
+    symbol_col   = find_col(['symbol', 'script', 'ticker', 'nse symbol'])
+    name_col     = find_col(['company', 'name', 'stock name', 'scrip'])
+    qty_col      = find_col(['quantity', 'qty', 'shares', 'no. of shares'])
+    avg_col      = find_col(['average price', 'avg price', 'avg. price',
+                              'buy price', 'average cost', 'avg cost'])
+    ltp_col      = find_col(['ltp', 'cmp', 'current price', 'last price', 'market price'])
+    curr_val_col = find_col(['current value', 'market value', 'present value'])
+    invested_col = find_col(['invested', 'buy value', 'cost value', 'investment'])
+    pnl_col      = find_col(['p&l', 'profit', 'gain', 'unrealised'])
+    pnl_pct_col  = find_col(['return%', 'return %', 'p&l%', 'gain%', '% return'])
+
+    if symbol_col is None or qty_col is None:
+        raise ValueError(
+            "Could not find Symbol or Quantity columns. "
+            "Please check this is a Groww equity holdings export."
+        )
+
+    def to_float(v, default=0.0):
+        if v is None:
+            return default
+        if isinstance(v, (int, float)):
+            return float(v)
+        s = str(v).replace(',', '').replace('₹', '').replace('%', '').strip()
+        try:
+            return float(s)
+        except ValueError:
+            return default
+
+    stocks = []
+    for i in range(header_row_idx + 1, ws.max_row + 1):
+        row = [ws.cell(i, j).value for j in range(1, ws.max_column + 1)]
+        symbol = str(row[symbol_col] if row[symbol_col] else '').strip().upper()
+        if not symbol or symbol in ('SYMBOL', 'TOTAL', 'GRAND TOTAL', ''):
+            continue
+
+        qty = to_float(row[qty_col] if qty_col is not None else None)
+        if qty <= 0:
+            continue
+
+        stock = {
+            "symbol":               symbol,
+            "company_name":         str(row[name_col] if name_col is not None and row[name_col] else symbol).strip(),
+            "qty":                  qty,
+            "avg_cost":             to_float(row[avg_col] if avg_col is not None else None),
+            "groww_ltp":            to_float(row[ltp_col] if ltp_col is not None else None),
+            "groww_current_value":  to_float(row[curr_val_col] if curr_val_col is not None else None),
+            "groww_invested":       to_float(row[invested_col] if invested_col is not None else None),
+            "groww_pnl":            to_float(row[pnl_col] if pnl_col is not None else None),
+            "groww_pnl_pct":        to_float(row[pnl_pct_col] if pnl_pct_col is not None else None),
+            "import_source":        "groww_stocks_excel",
+            "groww_last_import":    date.today().isoformat(),
+        }
+        stocks.append(stock)
+
+    return stocks
 
 
 # ---------------------------------------------------------------------------
@@ -940,14 +1035,12 @@ def api_clear_cache():
 
 @app.route("/api/stocks", methods=["GET"])
 @login_required
-@owner_required
 def api_get_stocks():
     return jsonify(load_stocks())
 
 
 @app.route("/api/stocks", methods=["POST"])
 @login_required
-@owner_required
 def api_add_stock():
     stocks = load_stocks()
     stock  = request.json
@@ -961,7 +1054,6 @@ def api_add_stock():
 
 @app.route("/api/stocks/<stock_id>", methods=["PUT"])
 @login_required
-@owner_required
 def api_update_stock(stock_id):
     stocks = load_stocks()
     body   = request.json
@@ -975,16 +1067,65 @@ def api_update_stock(stock_id):
 
 @app.route("/api/stocks/<stock_id>", methods=["DELETE"])
 @login_required
-@owner_required
 def api_delete_stock(stock_id):
     stocks = [s for s in load_stocks() if s["id"] != stock_id]
     save_stocks(stocks)
     return jsonify({"success": True})
 
 
+@app.route("/api/import/groww-stocks", methods=["POST"])
+@login_required
+def api_import_groww_stocks():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    f = request.files["file"]
+    if not f.filename.lower().endswith((".xlsx", ".xls")):
+        return jsonify({"error": "Please upload an Excel (.xlsx) file"}), 400
+    try:
+        parsed = parse_groww_stocks_excel(f.read())
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    if not parsed:
+        return jsonify({"error": "No stock data found in the file"}), 400
+
+    stocks = load_stocks()
+    symbol_index = {s.get("symbol", "").upper(): i for i, s in enumerate(stocks)}
+    existing_ids = {int(s.get("id", 0)) for s in stocks if str(s.get("id", "")).isdigit()}
+    next_id = max(existing_ids, default=0) + 1
+    added = updated = 0
+
+    for stock in parsed:
+        sym = stock["symbol"].upper()
+        if sym in symbol_index:
+            idx = symbol_index[sym]
+            stocks[idx] = {
+                **stocks[idx],
+                "qty":                  stock["qty"],
+                "avg_cost":             stock["avg_cost"],
+                "company_name":         stock.get("company_name", stocks[idx].get("company_name", sym)),
+                "groww_ltp":            stock.get("groww_ltp"),
+                "groww_current_value":  stock.get("groww_current_value"),
+                "groww_invested":       stock.get("groww_invested"),
+                "groww_pnl":            stock.get("groww_pnl"),
+                "groww_pnl_pct":        stock.get("groww_pnl_pct"),
+                "groww_last_import":    stock["groww_last_import"],
+                "import_source":        "groww_stocks_excel",
+            }
+            updated += 1
+        else:
+            stock["id"]         = str(next_id)
+            stock["created_at"] = datetime.now().isoformat()
+            stocks.append(stock)
+            symbol_index[sym]   = len(stocks) - 1
+            next_id += 1
+            added += 1
+
+    save_stocks(stocks)
+    return jsonify({"success": True, "added": added, "updated": updated, "total": len(parsed)})
+
+
 @app.route("/api/stocks/dashboard")
 @login_required
-@owner_required
 def api_stocks_dashboard():
     stocks  = load_stocks()
     symbols = list({s.get("symbol", "").upper() for s in stocks if s.get("symbol")})

@@ -186,17 +186,6 @@
       <button class="btn btn-sm btn-outline-secondary" onclick="refreshActive(true)" title="Force refresh">
         <i class="bi bi-arrow-clockwise"></i> Refresh
       </button>
-      <!-- Import Groww Excel: visible to all logged-in users -->
-      <button class="btn btn-sm btn-outline-info" onclick="document.getElementById('growwFileInput').click()" title="Import from Groww Excel">
-        <i class="bi bi-upload"></i> Import Groww
-      </button>
-      <input type="file" id="growwFileInput" accept=".xlsx,.xls" style="display:none" onchange="importGrowwFile(this)"/>
-      <!-- Add SIP: owner only -->
-      {% if is_owner %}
-      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSipModal">
-        <i class="bi bi-plus-lg"></i> Add SIP
-      </button>
-      {% endif %}
       {% if user %}
       <div class="d-flex align-items-center gap-2 ms-1">
         {% if user.picture %}
@@ -221,14 +210,12 @@
         <i class="bi bi-graph-up-arrow me-1"></i>Mutual Funds
       </button>
     </li>
-    {% if is_owner %}
     <li class="nav-item">
       <button class="nav-link" id="stocks-tab" data-bs-toggle="tab" data-bs-target="#stocksPane" type="button"
               onclick="onTabSwitch('stocks')">
         <i class="bi bi-bar-chart-line me-1"></i>Stocks
       </button>
     </li>
-    {% endif %}
   </ul>
 </div>
 
@@ -240,12 +227,25 @@
 <div class="tab-pane fade show active" id="mfPane" role="tabpanel">
 <div class="container-fluid px-3 px-md-4 py-4">
 
-  {% if not is_owner %}
-  <div class="view-only-banner mb-3">
-    <i class="bi bi-eye"></i>
-    View-only mode — upload your own Groww Excel to see your portfolio.
+  <!-- MF Import CTA -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="text-muted small">
+      {% if not is_owner %}
+      <i class="bi bi-eye me-1"></i>Upload your Groww Excel to see your mutual fund portfolio.
+      {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+      <input type="file" id="growwFileInput" accept=".xlsx,.xls" style="display:none" onchange="importGrowwFile(this)"/>
+      <button class="btn btn-sm btn-outline-info" onclick="document.getElementById('growwFileInput').click()">
+        <i class="bi bi-upload me-1"></i>Import Groww MF Excel
+      </button>
+      {% if is_owner %}
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSipModal">
+        <i class="bi bi-plus-lg"></i> Add SIP
+      </button>
+      {% endif %}
+    </div>
   </div>
-  {% endif %}
 
   <!-- Summary cards -->
   <div class="row g-3 mb-4">
@@ -373,9 +373,8 @@
 </div><!-- /mfPane -->
 
 <!-- ═══════════════════════════════════════════════════════════
-     STOCKS TAB (owner only)
+     STOCKS TAB
 ═══════════════════════════════════════════════════════════ -->
-{% if is_owner %}
 <div class="tab-pane fade" id="stocksPane" role="tabpanel">
 <div class="container-fluid px-3 px-md-4 py-4">
 
@@ -431,28 +430,35 @@
     </div>
   </div>
 
-  <!-- Add stock button + info -->
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <!-- Stocks actions bar -->
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div class="text-muted small">
       <i class="bi bi-info-circle me-1"></i>
       Prices from NSE via Yahoo Finance · cached 15 min · use NSE ticker symbols (e.g. RELIANCE, INFY, TCS)
     </div>
-    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addStockModal">
-      <i class="bi bi-plus-lg"></i> Add Stock
-    </button>
+    <div class="d-flex gap-2">
+      <input type="file" id="growwStocksFileInput" accept=".xlsx,.xls" style="display:none" onchange="importGrowwStocksFile(this)"/>
+      <button class="btn btn-sm btn-outline-info" onclick="document.getElementById('growwStocksFileInput').click()">
+        <i class="bi bi-upload me-1"></i>Import Groww Stocks Excel
+      </button>
+      {% if is_owner %}
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addStockModal">
+        <i class="bi bi-plus-lg"></i> Add Stock
+      </button>
+      {% endif %}
+    </div>
   </div>
 
   <div class="col-12 empty-state" id="stk-emptyState" style="display:none">
     <i class="bi bi-bar-chart" style="font-size:3rem;display:block;margin-bottom:1rem;opacity:.3"></i>
     <div class="fw-semibold mb-1">No stocks added yet</div>
-    <div class="text-muted small">Click <strong>+ Add Stock</strong> to start tracking your equity portfolio.</div>
+    <div class="text-muted small">Click <strong>Import Groww Stocks Excel</strong> to upload your equity portfolio.</div>
   </div>
 
   <div class="row g-3" id="stockGrid"></div>
 
 </div>
 </div><!-- /stocksPane -->
-{% endif %}
 
 </div><!-- /tab-content -->
 
@@ -1110,12 +1116,33 @@ function showImportResult(success, errMsg, data) {
   new bootstrap.Modal(document.getElementById('importResultModal')).show();
 }
 
+// ── Groww Stocks Excel Import ────────────────────────────────────────────────
+async function importGrowwStocksFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  setLoading('Importing your Groww stocks portfolio…');
+  try {
+    const fd  = new FormData();
+    fd.append('file', file);
+    const res  = await fetch('/api/import/groww-stocks', {method:'POST', body:fd});
+    const data = await res.json();
+    hideLoading();
+    if (data.error) { showImportResult(false, data.error, null); return; }
+    showImportResult(true, null, data);
+    stocksLoaded = false;
+    await loadStocksTab(false);
+  } catch(e) {
+    hideLoading();
+    showImportResult(false, 'Network error — is the server running?', null);
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════
-//  STOCKS (owner only)
+//  STOCKS
 // ══════════════════════════════════════════════════════════════════════════
 
 async function loadStocksTab(force = false) {
-  if (!IS_OWNER) return;
   stocksLoaded = true;
   setLoading('Fetching live NSE prices…');
   try {
@@ -1256,9 +1283,7 @@ function stockCard(s) {
           </div>
           <div class="d-flex flex-column align-items-end gap-1">
             <span class="badge bg-${badgeCls}" style="font-size:.72rem">${r.icon||'❓'} ${r.status||'—'}</span>
-            <button class="btn btn-link btn-sm p-0 text-muted" onclick="confirmDelete('stock','${s.id}')" title="Remove">
-              <i class="bi bi-x-circle" style="font-size:.85rem"></i>
-            </button>
+            ${IS_OWNER ? `<button class="btn btn-link btn-sm p-0 text-muted" onclick="confirmDelete('stock','${s.id}')" title="Remove"><i class="bi bi-x-circle" style="font-size:.85rem"></i></button>` : ''}
           </div>
         </div>
         ${pd ? `<div class="mt-2"><span class="fw-bold" style="font-size:1.25rem">₹${pd.current_price.toLocaleString('en-IN',{maximumFractionDigits:2})}</span>
