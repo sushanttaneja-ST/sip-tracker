@@ -106,12 +106,27 @@ def logout():
     return redirect(url_for('login_page'))
 
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
-# DATA_DIR can be overridden via env var for cloud deployments with a persistent volume
-DATA_DIR        = os.getenv('DATA_DIR', os.path.join(BASE_DIR, 'data', 'users'))
-CACHE_DIR       = os.getenv('CACHE_DIR', os.path.join(BASE_DIR, 'cache'))
+DATA_DIR        = os.path.join(BASE_DIR, 'data', 'users')   # local dev only
+CACHE_DIR       = os.path.join(BASE_DIR, 'cache')           # local dev only
 CACHE_TTL       = 6 * 3600   # 6 hours NAV cache
 STOCK_CACHE_TTL = 15 * 60    # 15 minutes stock price cache
 OWNER_EMAIL     = os.getenv('OWNER_EMAIL', '').lower().strip()
+
+# ---------------------------------------------------------------------------
+# Supabase (production) vs local JSON (development)
+# ---------------------------------------------------------------------------
+SUPABASE_URL = os.getenv('SUPABASE_URL', '')
+SUPABASE_KEY = os.getenv('SUPABASE_ANON_KEY', '')
+USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
+
+_sb = None
+if USE_SUPABASE:
+    from supabase import create_client
+    _sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+def _get_email():
+    return (session.get('user') or {}).get('email', 'default')
 
 # ---------------------------------------------------------------------------
 # Benchmark XIRR targets by category
@@ -183,25 +198,32 @@ SUBCATEGORY_MAP = {
 
 
 # ---------------------------------------------------------------------------
-# Data helpers
+# Data helpers — Supabase in production, JSON files locally
 # ---------------------------------------------------------------------------
 
-def _user_data_file():
-    email = (session.get('user') or {}).get('email', 'default')
-    safe  = email.replace('@', '_at_').replace('.', '_')
+def _local_sips_path():
+    safe = _get_email().replace('@', '_at_').replace('.', '_')
     return os.path.join(DATA_DIR, safe, "sips.json")
 
 
 def load_sips():
-    path = _user_data_file()
-    if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
-    return []
+    if USE_SUPABASE:
+        res = _sb.table('sips').select('data').eq('user_email', _get_email()).execute()
+        return [r['data'] for r in res.data]
+    path = _local_sips_path()
+    return json.load(open(path)) if os.path.exists(path) else []
 
 
 def save_sips(sips):
-    path = _user_data_file()
+    if USE_SUPABASE:
+        email = _get_email()
+        _sb.table('sips').delete().eq('user_email', email).execute()
+        if sips:
+            _sb.table('sips').insert(
+                [{'id': s['id'], 'user_email': email, 'data': s} for s in sips]
+            ).execute()
+        return
+    path = _local_sips_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(sips, f, indent=2)
@@ -231,25 +253,32 @@ def owner_required(f):
 
 
 # ---------------------------------------------------------------------------
-# Stocks data helpers (per-user, same folder as sips)
+# Stocks data helpers
 # ---------------------------------------------------------------------------
 
-def _user_stocks_file():
-    email = (session.get('user') or {}).get('email', 'default')
-    safe  = email.replace('@', '_at_').replace('.', '_')
+def _local_stocks_path():
+    safe = _get_email().replace('@', '_at_').replace('.', '_')
     return os.path.join(DATA_DIR, safe, "stocks.json")
 
 
 def load_stocks():
-    path = _user_stocks_file()
-    if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
-    return []
+    if USE_SUPABASE:
+        res = _sb.table('stocks').select('data').eq('user_email', _get_email()).execute()
+        return [r['data'] for r in res.data]
+    path = _local_stocks_path()
+    return json.load(open(path)) if os.path.exists(path) else []
 
 
 def save_stocks(stocks):
-    path = _user_stocks_file()
+    if USE_SUPABASE:
+        email = _get_email()
+        _sb.table('stocks').delete().eq('user_email', email).execute()
+        if stocks:
+            _sb.table('stocks').insert(
+                [{'id': s['id'], 'user_email': email, 'data': s} for s in stocks]
+            ).execute()
+        return
+    path = _local_stocks_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(stocks, f, indent=2)
@@ -260,11 +289,18 @@ def save_stocks(stocks):
 # ---------------------------------------------------------------------------
 
 def _fetch_one_price(sym):
-    sym_upper  = sym.strip().upper()
-    cache_path = os.path.join(CACHE_DIR, f"stk_{sym_upper}.json")
-    if os.path.exists(cache_path) and (time.time() - os.path.getmtime(cache_path)) < STOCK_CACHE_TTL:
-        with open(cache_path) as f:
-            return sym_upper, json.load(f)
+    sym_upper = sym.strip().upper()
+
+    # Check cache
+    if USE_SUPABASE:
+        res = _sb.table('stock_cache').select('data, cached_at').eq('symbol', sym_upper).execute()
+        if res.data and (time.time() - res.data[0]['cached_at']) < STOCK_CACHE_TTL:
+            return sym_upper, res.data[0]['data']
+    else:
+        cache_path = os.path.join(CACHE_DIR, f"stk_{sym_upper}.json")
+        if os.path.exists(cache_path) and (time.time() - os.path.getmtime(cache_path)) < STOCK_CACHE_TTL:
+            return sym_upper, json.load(open(cache_path))
+
     try:
         import yfinance as yf
         t    = yf.Ticker(sym_upper + ".NS")
@@ -282,9 +318,12 @@ def _fetch_one_price(sym):
             "week52_low":    round(low52, 2),
             "range_pct":     round(range_pct, 1),
         }
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(cache_path, "w") as f:
-            json.dump(result, f)
+        if USE_SUPABASE:
+            _sb.table('stock_cache').upsert({'symbol': sym_upper, 'data': result, 'cached_at': time.time()}).execute()
+        else:
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(os.path.join(CACHE_DIR, f"stk_{sym_upper}.json"), "w") as f:
+                json.dump(result, f)
         return sym_upper, result
     except Exception:
         return sym_upper, None
@@ -358,31 +397,33 @@ def stock_recommend(stock, price_data):
 
 
 # ---------------------------------------------------------------------------
-# Fund data with file-based cache (used for manual SIPs)
+# Fund NAV cache — Supabase in production, files locally
 # ---------------------------------------------------------------------------
-
-def _cache_path(scheme_code):
-    return os.path.join(CACHE_DIR, f"{scheme_code}.json")
-
-
-def _cache_valid(path):
-    return os.path.exists(path) and (time.time() - os.path.getmtime(path)) < CACHE_TTL
-
 
 def fetch_fund_data(scheme_code):
     if not scheme_code:
         return None
-    path = _cache_path(scheme_code)
-    if _cache_valid(path):
-        with open(path) as f:
-            return json.load(f)
+
+    # Check cache
+    if USE_SUPABASE:
+        res = _sb.table('nav_cache').select('data, cached_at').eq('scheme_code', scheme_code).execute()
+        if res.data and (time.time() - res.data[0]['cached_at']) < CACHE_TTL:
+            return res.data[0]['data']
+    else:
+        path = os.path.join(CACHE_DIR, f"{scheme_code}.json")
+        if os.path.exists(path) and (time.time() - os.path.getmtime(path)) < CACHE_TTL:
+            return json.load(open(path))
+
     try:
         resp = requests.get(f"https://api.mfapi.in/mf/{scheme_code}", timeout=15)
         if resp.status_code == 200:
             data = resp.json()
-            os.makedirs(CACHE_DIR, exist_ok=True)
-            with open(path, "w") as f:
-                json.dump(data, f)
+            if USE_SUPABASE:
+                _sb.table('nav_cache').upsert({'scheme_code': scheme_code, 'data': data, 'cached_at': time.time()}).execute()
+            else:
+                os.makedirs(CACHE_DIR, exist_ok=True)
+                with open(os.path.join(CACHE_DIR, f"{scheme_code}.json"), "w") as f:
+                    json.dump(data, f)
             return data
     except Exception:
         pass
@@ -880,6 +921,9 @@ def api_search_funds():
 @app.route("/api/clear-cache", methods=["POST"])
 @login_required
 def api_clear_cache():
+    if USE_SUPABASE:
+        _sb.table('nav_cache').delete().neq('scheme_code', '___').execute()
+        return jsonify({"cleared": "all"})
     count = 0
     if os.path.exists(CACHE_DIR):
         for f in os.listdir(CACHE_DIR):
