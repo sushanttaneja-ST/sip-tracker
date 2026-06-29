@@ -449,6 +449,28 @@
     </div>
   </div>
 
+  <!-- Stock filter bar -->
+  <div class="d-flex gap-2 flex-wrap align-items-center mb-3" id="stkFilterBar" style="display:none">
+    <button class="btn btn-sm filter-btn active" data-stkfilter="ALL" onclick="filterStocks('ALL',this)">
+      All <span class="badge bg-secondary ms-1" id="scnt-ALL">0</span>
+    </button>
+    <button class="btn btn-sm filter-btn" data-stkfilter="ACCUMULATE" onclick="filterStocks('ACCUMULATE',this)">
+      ✅ Accumulate <span class="badge ms-1" id="scnt-ACCUMULATE">0</span>
+    </button>
+    <button class="btn btn-sm filter-btn" data-stkfilter="HOLD" onclick="filterStocks('HOLD',this)">
+      👍 Hold <span class="badge ms-1" id="scnt-HOLD">0</span>
+    </button>
+    <button class="btn btn-sm filter-btn" data-stkfilter="BOOK PARTIAL" onclick="filterStocks('BOOK PARTIAL',this)">
+      📤 Book Partial <span class="badge ms-1" id="scnt-BOOK_PARTIAL">0</span>
+    </button>
+    <button class="btn btn-sm filter-btn" data-stkfilter="REVIEW" onclick="filterStocks('REVIEW',this)">
+      ⚠️ Review <span class="badge ms-1" id="scnt-REVIEW">0</span>
+    </button>
+    <button class="btn btn-sm filter-btn" data-stkfilter="EXIT" onclick="filterStocks('EXIT',this)">
+      🚨 Exit <span class="badge ms-1" id="scnt-EXIT">0</span>
+    </button>
+  </div>
+
   <div class="col-12 empty-state" id="stk-emptyState" style="display:none">
     <i class="bi bi-bar-chart" style="font-size:3rem;display:block;margin-bottom:1rem;opacity:.3"></i>
     <div class="fw-semibold mb-1">No stocks added yet</div>
@@ -638,11 +660,12 @@
 // ── Role & state ───────────────────────────────────────────────────────────
 const IS_OWNER = {{ 'true' if is_owner else 'false' }};
 
-let allSips        = [];
-let allStocks      = [];
-let activeFilter   = 'ALL';
-let activeTab      = 'mf';
-let stocksLoaded   = false;
+let allSips           = [];
+let allStocks         = [];
+let activeFilter      = 'ALL';
+let activeStockFilter = 'ALL';
+let activeTab         = 'mf';
+let stocksLoaded      = false;
 let searchTimer    = null;
 let allocationChart = null;
 let xirrChart       = null;
@@ -1187,6 +1210,23 @@ function renderStocksSummary(s) {
     `<span class="text-green">${buy}✅</span> &nbsp;` +
     `<span style="color:#79c0ff">${hold}👍</span> &nbsp;` +
     `<span class="text-red">${sell}⚠️</span>`;
+
+  // populate filter badge counts
+  const total = Object.values(sc).reduce((a,b)=>a+b,0);
+  document.getElementById('scnt-ALL').textContent          = total;
+  document.getElementById('scnt-ACCUMULATE').textContent  = sc['ACCUMULATE']   || 0;
+  document.getElementById('scnt-HOLD').textContent        = hold;
+  document.getElementById('scnt-BOOK_PARTIAL').textContent= sc['BOOK PARTIAL'] || 0;
+  document.getElementById('scnt-REVIEW').textContent      = sc['REVIEW']       || 0;
+  document.getElementById('scnt-EXIT').textContent        = sc['EXIT']         || 0;
+  document.getElementById('stkFilterBar').style.display   = '';
+}
+
+function filterStocks(filter, btn) {
+  activeStockFilter = filter;
+  document.querySelectorAll('[data-stkfilter]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderStocks(allStocks);
 }
 
 function renderStocks(stocks) {
@@ -1195,10 +1235,17 @@ function renderStocks(stocks) {
   if (!stocks || stocks.length === 0) {
     grid.innerHTML = '';
     empty.style.display = '';
-  } else {
-    empty.style.display = 'none';
-    grid.innerHTML = stocks.map(s => stockCard(s)).join('');
+    return;
   }
+  const filtered = activeStockFilter === 'ALL'
+    ? stocks
+    : stocks.filter(s => {
+        const status = (s.recommendation || {}).status || '';
+        if (activeStockFilter === 'HOLD') return status === 'HOLD' || status === 'HOLD/TRIM';
+        return status === activeStockFilter;
+      });
+  empty.style.display = filtered.length === 0 ? '' : 'none';
+  grid.innerHTML = filtered.map(s => stockCard(s)).join('');
 }
 
 function stockCard(s) {
