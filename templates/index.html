@@ -163,6 +163,15 @@
     .stat-value { font-size: 1.3rem; }
     .sip-card   { margin-bottom: .75rem; }
   }
+
+  /* ── Privacy mode ── */
+  .private-val { transition: filter .2s ease; }
+  body.privacy-mode .private-val {
+    filter: blur(7px);
+    user-select: none;
+    cursor: pointer;
+  }
+  #privacyBtn { min-width: 34px; }
 </style>
 </head>
 <body>
@@ -183,6 +192,9 @@
     </span>
     <div class="ms-auto d-flex gap-2 align-items-center">
       <span id="lastUpdated" class="text-muted small d-none d-md-inline"></span>
+      <button id="privacyBtn" class="btn btn-sm btn-outline-secondary" onclick="togglePrivacy()" title="Toggle value visibility">
+        <i id="privacyIcon" class="bi bi-eye-slash"></i>
+      </button>
       <button class="btn btn-sm btn-outline-secondary" onclick="refreshActive(true)" title="Force refresh">
         <i class="bi bi-arrow-clockwise"></i> Refresh
       </button>
@@ -235,10 +247,10 @@
 <div id="combinedOverview" class="container-fluid px-3 px-md-4 py-2" style="background:rgba(22,27,34,0.7);border-bottom:1px solid #30363d;display:none">
   <div class="d-flex gap-4 align-items-center flex-wrap">
     <span class="text-muted small fw-semibold" style="font-size:.75rem;letter-spacing:.05em">COMBINED PORTFOLIO</span>
-    <div><div class="fw-bold" id="comb-value">—</div><div class="text-muted" style="font-size:.7rem">Total Value</div></div>
-    <div><div class="fw-bold" id="comb-invested">—</div><div class="text-muted" style="font-size:.7rem">Invested</div></div>
-    <div><div class="fw-bold" id="comb-pl">—</div><div class="text-muted" style="font-size:.7rem">P&amp;L</div></div>
-    <div><div class="fw-bold" id="comb-pct">—</div><div class="text-muted" style="font-size:.7rem">Return</div></div>
+    <div><div class="fw-bold private-val" id="comb-value">—</div><div class="text-muted" style="font-size:.7rem">Total Value</div></div>
+    <div><div class="fw-bold private-val" id="comb-invested">—</div><div class="text-muted" style="font-size:.7rem">Invested</div></div>
+    <div><div class="fw-bold private-val" id="comb-pl">—</div><div class="text-muted" style="font-size:.7rem">P&amp;L</div></div>
+    <div><div class="fw-bold private-val" id="comb-pct">—</div><div class="text-muted" style="font-size:.7rem">Return</div></div>
   </div>
 </div>
 
@@ -277,7 +289,7 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="stat-label">Total Invested</div>
-            <div class="stat-value" id="totalInvested">—</div>
+            <div class="stat-value private-val" id="totalInvested">—</div>
           </div>
           <i class="bi bi-wallet2 stat-icon"></i>
         </div>
@@ -289,7 +301,7 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="stat-label">Current Value</div>
-            <div class="stat-value" id="currentValue">—</div>
+            <div class="stat-value private-val" id="currentValue">—</div>
           </div>
           <i class="bi bi-graph-up stat-icon"></i>
         </div>
@@ -301,11 +313,11 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="stat-label">Total P&amp;L</div>
-            <div class="stat-value" id="totalPL">—</div>
+            <div class="stat-value private-val" id="totalPL">—</div>
           </div>
           <i class="bi bi-currency-rupee stat-icon"></i>
         </div>
-        <div class="mt-2 small" id="totalReturn">—</div>
+        <div class="mt-2 small private-val" id="totalReturn">—</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
@@ -424,7 +436,7 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="stat-label">Stocks Invested</div>
-            <div class="stat-value" id="stk-totalInvested">—</div>
+            <div class="stat-value private-val" id="stk-totalInvested">—</div>
           </div>
           <i class="bi bi-wallet2 stat-icon"></i>
         </div>
@@ -436,7 +448,7 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="stat-label">Current Value</div>
-            <div class="stat-value" id="stk-currentValue">—</div>
+            <div class="stat-value private-val" id="stk-currentValue">—</div>
           </div>
           <i class="bi bi-graph-up stat-icon"></i>
         </div>
@@ -448,11 +460,11 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="stat-label">Total P&amp;L</div>
-            <div class="stat-value" id="stk-totalPL">—</div>
+            <div class="stat-value private-val" id="stk-totalPL">—</div>
           </div>
           <i class="bi bi-currency-rupee stat-icon"></i>
         </div>
-        <div class="mt-2 small" id="stk-totalReturn">—</div>
+        <div class="mt-2 small private-val" id="stk-totalReturn">—</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
@@ -1091,7 +1103,7 @@ function sipCard(s) {
     : '';
 
   const sipAmountRow = !isImport && s.amount
-    ? `<div class="metric-row"><span class="metric-label">Monthly SIP</span><span class="metric-value">${fmt(s.amount)}</span></div>` : '';
+    ? `<div class="metric-row"><span class="metric-label">Monthly SIP</span><span class="metric-value private-val">${fmt(s.amount)}</span></div>` : '';
 
   const installmentsRow = (p.installments != null)
     ? `<div class="metric-row"><span class="metric-label">Installments</span><span class="metric-value">${p.installments} months</span></div>` : '';
@@ -1129,18 +1141,18 @@ function sipCard(s) {
           </div>
         </div>
         <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
-          <span class="xirr-badge bg-dark ${xClass}">${p.xirr.toFixed(2)}% XIRR</span>
+          <span class="xirr-badge bg-dark ${xClass} private-val">${p.xirr.toFixed(2)}% XIRR</span>
           <span style="font-size:.75rem">${gapStr}</span>
           ${xirrSource}
         </div>
       </div>
       <div class="sip-card-body">
         ${sipAmountRow}
-        <div class="metric-row"><span class="metric-label">Total Invested</span><span class="metric-value">${fmt(p.total_invested)}</span></div>
-        <div class="metric-row"><span class="metric-label">Current Value</span><span class="metric-value">${fmt(p.current_value)}</span></div>
+        <div class="metric-row"><span class="metric-label">Total Invested</span><span class="metric-value private-val">${fmt(p.total_invested)}</span></div>
+        <div class="metric-row"><span class="metric-label">Current Value</span><span class="metric-value private-val">${fmt(p.current_value)}</span></div>
         <div class="metric-row">
           <span class="metric-label">Profit / Loss</span>
-          <span class="metric-value ${plClass}">${p.profit_loss>=0?'+':'-'}${fmt(p.profit_loss)} (${fmtPct(p.absolute_return)})</span>
+          <span class="metric-value private-val ${plClass}">${p.profit_loss>=0?'+':'-'}${fmt(p.profit_loss)} (${fmtPct(p.absolute_return)})</span>
         </div>
         ${installmentsRow}${navRow}${folioRow}${notesRow}
         <div class="rec-box rec-${statusKey}">
@@ -1643,24 +1655,24 @@ function renderTaxReport(tax) {
       <div class="col-md-6">
         <div class="stat-card">
           <div class="stat-label">Short-Term Gains (STCG)</div>
-          <div class="stat-value text-green mt-1">${fmt(tax.stcg_profit)}</div>
-          <div class="mt-2 small text-muted">Tax @ 20% = <span class="text-red fw-semibold">${fmt(tax.stcg_tax)}</span></div>
+          <div class="stat-value text-green mt-1 private-val">${fmt(tax.stcg_profit)}</div>
+          <div class="mt-2 small text-muted">Tax @ 20% = <span class="text-red fw-semibold private-val">${fmt(tax.stcg_tax)}</span></div>
           <div class="mt-1 small text-muted">Holding &lt; 1 year</div>
         </div>
       </div>
       <div class="col-md-6">
         <div class="stat-card">
           <div class="stat-label">Long-Term Gains (LTCG)</div>
-          <div class="stat-value text-green mt-1">${fmt(tax.ltcg_profit)}</div>
-          <div class="mt-2 small text-muted">Exempt: ${fmt(tax.ltcg_exempt)} · Taxable: ${fmt(Math.max(0, tax.ltcg_profit - tax.ltcg_exempt))}</div>
-          <div class="mt-1 small text-muted">Tax @ 12.5% = <span class="text-red fw-semibold">${fmt(tax.ltcg_tax)}</span></div>
+          <div class="stat-value text-green mt-1 private-val">${fmt(tax.ltcg_profit)}</div>
+          <div class="mt-2 small text-muted">Exempt: <span class="private-val">${fmt(tax.ltcg_exempt)}</span> · Taxable: <span class="private-val">${fmt(Math.max(0, tax.ltcg_profit - tax.ltcg_exempt))}</span></div>
+          <div class="mt-1 small text-muted">Tax @ 12.5% = <span class="text-red fw-semibold private-val">${fmt(tax.ltcg_tax)}</span></div>
         </div>
       </div>
     </div>
     <div class="stat-card mb-4" style="border-color:rgba(218,54,51,.3)">
       <div class="d-flex justify-content-between align-items-center">
         <div><div class="stat-label">Total Estimated Tax Liability</div>
-          <div class="stat-value text-red mt-1">${fmt(tax.total_tax)}</div>
+          <div class="stat-value text-red mt-1 private-val">${fmt(tax.total_tax)}</div>
         </div>
         <i class="bi bi-calculator stat-icon"></i>
       </div>
@@ -1848,11 +1860,11 @@ function stockCard(s) {
     : '';
 
   const investedRows = invested > 0 ? `
-    <div class="metric-row"><span class="metric-label">Invested</span><span class="metric-value">${fmt(invested)}</span></div>
-    <div class="metric-row"><span class="metric-label">Current Value</span><span class="metric-value">${fmt(currVal)}</span></div>
+    <div class="metric-row"><span class="metric-label">Invested</span><span class="metric-value private-val">${fmt(invested)}</span></div>
+    <div class="metric-row"><span class="metric-label">Current Value</span><span class="metric-value private-val">${fmt(currVal)}</span></div>
     <div class="metric-row">
       <span class="metric-label">P&amp;L</span>
-      <span class="metric-value ${pnlClass}">${pnlAbs>=0?'+':'-'}${fmt(pnlAbs)} (${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%)</span>
+      <span class="metric-value private-val ${pnlClass}">${pnlAbs>=0?'+':'-'}${fmt(pnlAbs)} (${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%)</span>
     </div>` : '';
 
   const notesRow = s.notes
@@ -1874,7 +1886,7 @@ function stockCard(s) {
             ${IS_OWNER ? `<button class="btn btn-link btn-sm p-0 text-muted" onclick="confirmDelete('stock','${s.id}')" title="Remove"><i class="bi bi-x-circle" style="font-size:.85rem"></i></button>` : ''}
           </div>
         </div>
-        ${pd ? `<div class="mt-2"><span class="fw-bold" style="font-size:1.25rem">₹${pd.current_price.toLocaleString('en-IN',{maximumFractionDigits:2})}</span>
+        ${pd ? `<div class="mt-2"><span class="fw-bold private-val" style="font-size:1.25rem">₹${pd.current_price.toLocaleString('en-IN',{maximumFractionDigits:2})}</span>
           <span class="ms-2 ${pnlClass}" style="font-size:.88rem">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</span></div>` : ''}
       </div>
       <div class="sip-card-body">
@@ -1967,6 +1979,20 @@ if (sipDateEl) {
   sipDateEl.max   = new Date().toISOString().split('T')[0];
   sipDateEl.value = '2024-01-01';
 }
+
+// ── Privacy mode ─────────────────────────────────────────────────────────────
+function applyPrivacy(hidden) {
+  document.body.classList.toggle('privacy-mode', hidden);
+  const icon = document.getElementById('privacyIcon');
+  if (icon) icon.className = hidden ? 'bi bi-eye-slash' : 'bi bi-eye';
+}
+function togglePrivacy() {
+  const next = !document.body.classList.contains('privacy-mode');
+  localStorage.setItem('privacyMode', next ? '1' : '0');
+  applyPrivacy(next);
+}
+// Apply saved preference on load (default: hidden)
+applyPrivacy(localStorage.getItem('privacyMode') !== '0');
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 refreshDashboard(false);
