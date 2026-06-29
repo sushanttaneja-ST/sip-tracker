@@ -116,7 +116,8 @@ OWNER_EMAIL     = os.getenv('OWNER_EMAIL', '').lower().strip()
 # Supabase (production) vs local JSON (development)
 # ---------------------------------------------------------------------------
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
-SUPABASE_KEY = os.getenv('SUPABASE_ANON_KEY', '')
+# Use the service_role key (server-side only — bypasses RLS safely)
+SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
 USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
 
 _sb = None
