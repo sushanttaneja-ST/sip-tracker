@@ -106,7 +106,9 @@ def logout():
     return redirect(url_for('login_page'))
 
 BASE_DIR        = os.path.dirname(os.path.abspath(__file__))
-CACHE_DIR       = os.path.join(BASE_DIR, "cache")
+# DATA_DIR can be overridden via env var for cloud deployments with a persistent volume
+DATA_DIR        = os.getenv('DATA_DIR', os.path.join(BASE_DIR, 'data', 'users'))
+CACHE_DIR       = os.getenv('CACHE_DIR', os.path.join(BASE_DIR, 'cache'))
 CACHE_TTL       = 6 * 3600   # 6 hours NAV cache
 STOCK_CACHE_TTL = 15 * 60    # 15 minutes stock price cache
 OWNER_EMAIL     = os.getenv('OWNER_EMAIL', '').lower().strip()
@@ -185,10 +187,9 @@ SUBCATEGORY_MAP = {
 # ---------------------------------------------------------------------------
 
 def _user_data_file():
-    """Return the sips.json path for the currently logged-in user."""
     email = (session.get('user') or {}).get('email', 'default')
     safe  = email.replace('@', '_at_').replace('.', '_')
-    return os.path.join(BASE_DIR, "data", "users", safe, "sips.json")
+    return os.path.join(DATA_DIR, safe, "sips.json")
 
 
 def load_sips():
@@ -236,7 +237,7 @@ def owner_required(f):
 def _user_stocks_file():
     email = (session.get('user') or {}).get('email', 'default')
     safe  = email.replace('@', '_at_').replace('.', '_')
-    return os.path.join(BASE_DIR, "data", "users", safe, "stocks.json")
+    return os.path.join(DATA_DIR, safe, "stocks.json")
 
 
 def load_stocks():
