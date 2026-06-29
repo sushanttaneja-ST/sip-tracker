@@ -1398,6 +1398,120 @@ def api_stocks_dashboard():
     })
 
 
+# ---------------------------------------------------------------------------
+# IPO Data
+# ---------------------------------------------------------------------------
+_ipo_cache: dict = {"data": None, "ts": 0.0}
+_IPO_TTL = 3600  # 1 hour
+
+
+def _bse_headers():
+    return {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.bseindia.com/",
+        "Origin": "https://www.bseindia.com",
+    }
+
+
+def _parse_bse_date(s):
+    """Parse BSE date strings like '16/01/2025' or '2025-01-16' into a date."""
+    if not s:
+        return None
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d %b %Y"):
+        try:
+            return datetime.strptime(s.strip(), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def fetch_ipo_data():
+    global _ipo_cache
+    if _ipo_cache["data"] and time.time() - _ipo_cache["ts"] < _IPO_TTL:
+        return _ipo_cache["data"]
+
+    today = date.today()
+    result = {"open": [], "upcoming": [], "listed": [], "fetched_at": today.isoformat()}
+
+    # ── BSE Mainboard ─────────────────────────────────────────────────────────
+    for url, category in [
+        ("https://api.bseindia.com/BseIndiaAPI/api/IPO/w", "Main Board"),
+        ("https://api.bseindia.com/BseIndiaAPI/api/SMEIPO/w", "SME"),
+    ]:
+        try:
+            r = requests.get(url, headers=_bse_headers(), timeout=10)
+            if r.status_code != 200:
+                continue
+            rows = r.json().get("Table", [])
+            for row in rows:
+                open_d  = _parse_bse_date(row.get("OpenDate") or row.get("OPENDATE") or "")
+                close_d = _parse_bse_date(row.get("CloseDate") or row.get("CLOSEDATE") or "")
+                list_d  = _parse_bse_date(row.get("ListingDate") or row.get("LISTINGDATE") or "")
+                name    = (row.get("CompanyName") or row.get("COMPANYNAME") or "").strip()
+                if not name:
+                    continue
+
+                price_lo = str(row.get("PriceFrom") or row.get("PRICEFROM") or "").strip()
+                price_hi = str(row.get("PriceTo")   or row.get("PRICETO")   or "").strip()
+                price_band = f"₹{price_lo}–{price_hi}" if price_lo and price_hi else (
+                    f"₹{price_lo or price_hi}" if (price_lo or price_hi) else "—"
+                )
+
+                lot   = str(row.get("LotSize") or row.get("LOTSIZE") or "—").strip()
+                issue = str(row.get("IssueSize") or row.get("ISSUESIZE") or "—").strip()
+                try:
+                    issue_cr = f"₹{float(issue):.0f} Cr" if issue != "—" else "—"
+                except ValueError:
+                    issue_cr = issue
+
+                ipo = {
+                    "name":       name,
+                    "category":   category,
+                    "price_band": price_band,
+                    "lot_size":   lot,
+                    "issue_size": issue_cr,
+                    "open_date":  open_d.strftime("%-d %b %Y")  if open_d  else "—",
+                    "close_date": close_d.strftime("%-d %b %Y") if close_d else "—",
+                    "list_date":  list_d.strftime("%-d %b %Y")  if list_d  else "—",
+                }
+
+                if open_d and close_d and open_d <= today <= close_d:
+                    result["open"].append(ipo)
+                elif open_d and open_d > today:
+                    result["upcoming"].append(ipo)
+                elif list_d and list_d <= today:
+                    ipo["listed_days_ago"] = (today - list_d).days
+                    result["listed"].append(ipo)
+                elif close_d and close_d < today and not list_d:
+                    ipo["listed_days_ago"] = None
+                    result["listed"].append(ipo)
+        except Exception:
+            pass
+
+    # Sort upcoming by open_date asc, listed by recent first
+    def _sort_key_date(ipo, field):
+        try:
+            return datetime.strptime(ipo[field], "%-d %b %Y").date()
+        except Exception:
+            return date.max
+
+    result["upcoming"].sort(key=lambda x: _sort_key_date(x, "open_date"))
+    result["listed"].sort(key=lambda x: x.get("listed_days_ago") or 999)
+
+    _ipo_cache = {"data": result, "ts": time.time()}
+    return result
+
+
+@app.route("/api/ipo")
+@login_required
+def api_ipo():
+    try:
+        return jsonify(fetch_ipo_data())
+    except Exception as e:
+        return jsonify({"error": str(e), "open": [], "upcoming": [], "listed": []}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
     print(f"\n🚀  SIP Tracker → http://localhost:{port}\n")

@@ -430,6 +430,19 @@ body.privacy-mode .private-val {
         </a>
       </div>
     </div>
+    <hr class="sidebar-divider">
+    <!-- IPO group -->
+    <div class="sidebar-group" id="grp-markets">
+      <div class="sidebar-group-header" onclick="toggleGroup('grp-markets')">
+        <span>Markets</span>
+        <i class="bi bi-chevron-down sidebar-group-chevron"></i>
+      </div>
+      <div class="sidebar-group-items">
+        <a class="sidebar-link" data-target="ipoPane" data-title="IPO Tracker" onclick="switchPane(this)">
+          <i class="bi bi-rocket-takeoff"></i><span>IPO Tracker</span>
+        </a>
+      </div>
+    </div>
   </nav>
 
 </aside>
@@ -847,6 +860,47 @@ body.privacy-mode .private-val {
 </div>
 </div><!-- /historyPane -->
 
+<!-- ═══════════════════════════════════════════════════════════
+     IPO TAB
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-pane" id="ipoPane" role="tabpanel">
+<div class="container-fluid px-3 px-md-4 py-4">
+
+  <!-- Header row -->
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <div class="fw-semibold" style="font-size:1.05rem">IPO Tracker</div>
+      <div class="text-muted small mt-1">Live data from BSE India · refreshes every hour</div>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" onclick="loadIpoTab(true)">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+
+  <!-- Status pills -->
+  <div class="d-flex gap-2 flex-wrap mb-4" id="ipoFilterBar">
+    <button class="btn btn-sm filter-btn active" data-ipo-filter="open"     onclick="filterIpo('open',this)">🟢 Open Now <span class="badge ms-1" id="ipo-cnt-open">0</span></button>
+    <button class="btn btn-sm filter-btn"        data-ipo-filter="upcoming" onclick="filterIpo('upcoming',this)">🔵 Upcoming <span class="badge ms-1" id="ipo-cnt-upcoming">0</span></button>
+    <button class="btn btn-sm filter-btn"        data-ipo-filter="listed"   onclick="filterIpo('listed',this)">⚪ Recently Listed <span class="badge ms-1" id="ipo-cnt-listed">0</span></button>
+  </div>
+
+  <!-- Loading / empty -->
+  <div id="ipoLoading" class="text-center text-muted py-5">
+    <div class="spinner-ring mx-auto mb-3"></div>
+    <div class="small">Fetching IPO data from BSE…</div>
+  </div>
+  <div id="ipoEmpty" class="empty-state" style="display:none">
+    <i class="bi bi-rocket-takeoff" style="font-size:3rem;display:block;margin-bottom:1rem;opacity:.3"></i>
+    <div class="fw-semibold mb-1">No IPOs found in this category</div>
+    <div class="small">Try a different filter or check back later.</div>
+  </div>
+
+  <!-- IPO cards grid -->
+  <div class="row g-3" id="ipoGrid"></div>
+
+</div>
+</div><!-- /ipoPane -->
+
 </div><!-- /tab-content -->
 
 </div><!-- /main-wrapper -->
@@ -1068,6 +1122,8 @@ function onTabSwitch(tab) {
     if (taxData) renderTaxReport(taxData);
   } else if (tab === 'history') {
     loadHistoryTab();
+  } else if (tab === 'ipo') {
+    loadIpoTab();
   }
 }
 
@@ -1076,11 +1132,12 @@ function refreshActive(force = false) {
     if (force) clearStockCache();
     loadStocksTab(true);
   } else if (activeTab === 'tax') {
-    // tax data comes from stocks — reload stocks
     stocksLoaded = false;
     loadStocksTab(false);
   } else if (activeTab === 'history') {
     loadHistoryTab();
+  } else if (activeTab === 'ipo') {
+    loadIpoTab(true);
   } else {
     refreshDashboard(force);
   }
@@ -2120,6 +2177,109 @@ document.getElementById('confirmDeleteBtn').onclick = async () => {
   pendingDeleteType = null;
 };
 
+// ── IPO Tracker ──────────────────────────────────────────────────────────────
+let ipoData     = null;
+let ipoLoaded   = false;
+let activeIpoFilter = 'open';
+
+async function loadIpoTab(force = false) {
+  if (ipoLoaded && !force) { renderIpoGrid(); return; }
+  document.getElementById('ipoLoading').style.display = '';
+  document.getElementById('ipoEmpty').style.display   = 'none';
+  document.getElementById('ipoGrid').innerHTML        = '';
+  try {
+    const res = await fetch('/api/ipo');
+    ipoData   = await res.json();
+    ipoLoaded = true;
+    document.getElementById('ipo-cnt-open').textContent     = ipoData.open?.length     || 0;
+    document.getElementById('ipo-cnt-upcoming').textContent = ipoData.upcoming?.length || 0;
+    document.getElementById('ipo-cnt-listed').textContent   = ipoData.listed?.length   || 0;
+    // Auto-switch to upcoming if nothing open
+    if ((!ipoData.open || !ipoData.open.length) && ipoData.upcoming?.length) {
+      const btn = document.querySelector('[data-ipo-filter="upcoming"]');
+      if (btn) filterIpo('upcoming', btn);
+    }
+    renderIpoGrid();
+  } catch (e) {
+    document.getElementById('ipoLoading').style.display = 'none';
+    document.getElementById('ipoEmpty').style.display   = '';
+  }
+  document.getElementById('ipoLoading').style.display = 'none';
+}
+
+function filterIpo(filter, btn) {
+  activeIpoFilter = filter;
+  document.querySelectorAll('[data-ipo-filter]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderIpoGrid();
+}
+
+function renderIpoGrid() {
+  const grid  = document.getElementById('ipoGrid');
+  const empty = document.getElementById('ipoEmpty');
+  if (!ipoData) return;
+  const list = ipoData[activeIpoFilter] || [];
+  if (!list.length) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  grid.innerHTML = list.map(ipo => ipoCard(ipo, activeIpoFilter)).join('');
+}
+
+function ipoCard(ipo, section) {
+  const statusMap = {
+    open:     { label: 'Open Now',        cls: 'text-green',  bar: 'status-ACCUMULATE', badge: 'success' },
+    upcoming: { label: 'Upcoming',        cls: 'text-yellow', bar: 'status-REVIEW',     badge: 'warning' },
+    listed:   { label: 'Recently Listed', cls: '',            bar: 'status-HOLD',       badge: 'secondary' },
+  };
+  const { label, cls, bar, badge } = statusMap[section] || statusMap.listed;
+
+  const applyBtn = section === 'open'
+    ? `<a href="https://www.bseindia.com/markets/PublicIssues/IPOOpenIssues_MainFrames.html"
+          target="_blank" rel="noopener"
+          class="btn btn-sm btn-success w-100 mt-2">
+         <i class="bi bi-box-arrow-up-right me-1"></i>Apply on BSE
+       </a>`
+    : '';
+
+  const daysAgo = (ipo.listed_days_ago != null)
+    ? `<div class="text-muted" style="font-size:.72rem">Listed ${ipo.listed_days_ago === 0 ? 'today' : ipo.listed_days_ago + 'd ago'}</div>`
+    : '';
+
+  return `
+  <div class="col-sm-6 col-xl-4">
+    <div class="sip-card">
+      <div class="${bar}" style="height:4px"></div>
+      <div class="sip-card-header">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div style="min-width:0">
+            <div class="fw-semibold" style="font-size:.9rem;line-height:1.3">${escHtml(ipo.name)}</div>
+            <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
+              <span class="badge bg-dark border border-secondary" style="font-size:.65rem">${escHtml(ipo.category)}</span>
+              <span class="badge bg-${badge}" style="font-size:.68rem">${label}</span>
+            </div>
+          </div>
+          <div class="text-end flex-shrink-0">
+            <div class="fw-bold ${cls}" style="font-size:1rem">${escHtml(ipo.price_band)}</div>
+            <div class="text-muted" style="font-size:.72rem">Price Band</div>
+          </div>
+        </div>
+      </div>
+      <div class="sip-card-body">
+        <div class="metric-row"><span class="metric-label">Open Date</span><span class="metric-value">${escHtml(ipo.open_date)}</span></div>
+        <div class="metric-row"><span class="metric-label">Close Date</span><span class="metric-value">${escHtml(ipo.close_date)}</span></div>
+        ${ipo.list_date && ipo.list_date !== '—' ? `<div class="metric-row"><span class="metric-label">Listing Date</span><span class="metric-value">${escHtml(ipo.list_date)}</span></div>` : ''}
+        <div class="metric-row"><span class="metric-label">Lot Size</span><span class="metric-value">${escHtml(ipo.lot_size)} shares</span></div>
+        <div class="metric-row"><span class="metric-label">Issue Size</span><span class="metric-value">${escHtml(ipo.issue_size)}</span></div>
+        ${daysAgo}
+        ${applyBtn}
+      </div>
+    </div>
+  </div>`;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function escHtml(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -2170,7 +2330,7 @@ function switchPane(linkEl) {
   // Close sidebar on mobile
   if (window.innerWidth <= 768) closeSidebar();
   // Trigger onTabSwitch logic
-  const tabMap = { mfPane:'mf', stocksPane:'stocks', taxPane:'tax', historyPane:'history' };
+  const tabMap = { mfPane:'mf', stocksPane:'stocks', taxPane:'tax', historyPane:'history', ipoPane:'ipo' };
   if (tabMap[target]) onTabSwitch(tabMap[target]);
 }
 
