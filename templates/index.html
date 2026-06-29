@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -8,170 +8,370 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-  :root {
-    --bg-main: #0d0f14;
-    --bg-card: #161b22;
-    --bg-card2: #1c2230;
-    --border: #30363d;
-    --text-muted: #8b949e;
-    --green: #2ea043;
-    --green-bright: #39d353;
-    --yellow: #d29922;
-    --red: #da3633;
-    --blue: #1f6feb;
-    --purple: #8957e5;
+:root {
+  /* Dark theme (default) */
+  --bg-main: #0d0f14;
+  --bg-sidebar: #0d1117;
+  --bg-card: #161b22;
+  --bg-card2: #1c2230;
+  --bg-hover: rgba(255,255,255,.05);
+  --border: #30363d;
+  --text-primary: #e6edf3;
+  --text-muted: #8b949e;
+  --green: #2ea043;
+  --green-bright: #39d353;
+  --yellow: #d29922;
+  --red: #da3633;
+  --blue: #1f6feb;
+  --purple: #8957e5;
+}
+
+[data-theme="light"] {
+  --bg-main: #f6f8fa;
+  --bg-sidebar: #1a1f2e;
+  --bg-card: #ffffff;
+  --bg-card2: #f0f2f5;
+  --bg-hover: rgba(0,0,0,.04);
+  --border: #d0d7de;
+  --text-primary: #1f2328;
+  --text-muted: #57606a;
+}
+
+body {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  transition: background .2s, color .2s;
+}
+
+/* ── App shell ── */
+.app-shell { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px;
+  min-height: 100vh;
+  background: var(--bg-sidebar);
+  border-right: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 1000;
+  transition: width .25s cubic-bezier(.4,0,.2,1), transform .25s cubic-bezier(.4,0,.2,1);
+}
+.sidebar.collapsed { width: 68px; }
+
+/* Brand */
+.sidebar-brand {
+  padding: 0 1rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sidebar-brand .brand-icon { font-size: 1.35rem; flex-shrink: 0; }
+.sidebar-brand .brand-text { font-weight: 700; font-size: 1rem; color: #e6edf3; white-space: nowrap; flex: 1; }
+.sidebar-brand .collapse-btn {
+  margin-left: auto;
+  background: none; border: none;
+  color: #8b949e; cursor: pointer;
+  padding: .25rem; border-radius: 6px;
+  flex-shrink: 0; line-height: 1;
+  display: flex; align-items: center;
+}
+.sidebar-brand .collapse-btn:hover { background: rgba(255,255,255,.1); color: #e6edf3; }
+.sidebar.collapsed .brand-text,
+.sidebar.collapsed .collapse-btn { display: none; }
+/* Show a mini collapse toggle when collapsed */
+.sidebar.collapsed .sidebar-brand { justify-content: center; }
+
+/* Nav */
+.sidebar-nav {
+  flex: 1;
+  padding: .5rem 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .65rem 1.15rem;
+  color: #8b949e;
+  text-decoration: none;
+  font-size: .88rem;
+  font-weight: 500;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .15s, background .15s, border-color .15s;
+  user-select: none;
+}
+.sidebar-link i { font-size: 1.1rem; flex-shrink: 0; width: 1.2rem; text-align: center; }
+.sidebar-link span { overflow: hidden; }
+.sidebar-link:hover { color: #e6edf3; background: rgba(255,255,255,.05); }
+.sidebar-link.active { color: var(--blue); border-left-color: var(--blue); background: rgba(31,111,235,.12); }
+.sidebar.collapsed .sidebar-link { justify-content: center; padding: .65rem 0; border-left: none; border-right: 3px solid transparent; }
+.sidebar.collapsed .sidebar-link.active { border-right-color: var(--blue); background: rgba(31,111,235,.12); }
+.sidebar.collapsed .sidebar-link span { display: none; }
+
+/* Section label */
+.sidebar-section {
+  padding: .5rem 1.1rem .2rem;
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  color: rgba(139,148,158,.6);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sidebar.collapsed .sidebar-section { display: none; }
+
+/* Sidebar divider */
+.sidebar-divider { border-color: rgba(255,255,255,.08); margin: .4rem .8rem; }
+
+/* Footer */
+.sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding: .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  flex-shrink: 0;
+}
+.sidebar-footer-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.sidebar-footer-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,.12);
+  color: #8b949e;
+  border-radius: 8px;
+  padding: .35rem .6rem;
+  font-size: .82rem;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex; align-items: center; gap: .4rem;
+  white-space: nowrap;
+}
+.sidebar-footer-btn:hover { background: rgba(255,255,255,.08); color: #e6edf3; border-color: rgba(255,255,255,.2); }
+.sidebar.collapsed .sidebar-footer-btn span { display: none; }
+.sidebar.collapsed .sidebar-footer-row { justify-content: center; }
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .4rem .2rem;
+  overflow: hidden;
+}
+.sidebar-user img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); flex-shrink: 0; }
+.sidebar-user-name { font-size: .8rem; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar.collapsed .sidebar-user-name { display: none; }
+
+/* ── Main wrapper ── */
+.main-wrapper {
+  margin-left: 240px;
+  flex: 1;
+  min-width: 0;
+  transition: margin-left .25s cubic-bezier(.4,0,.2,1);
+}
+.sidebar.collapsed + .sidebar-overlay + .main-wrapper { margin-left: 68px; }
+
+/* ── Top bar ── */
+.topbar {
+  height: 56px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 0 1.25rem;
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar-title { font-weight: 600; font-size: 1rem; color: var(--text-primary); }
+.hamburger-btn {
+  display: none;
+  background: none; border: none;
+  color: var(--text-muted); cursor: pointer;
+  padding: .3rem; border-radius: 6px; line-height: 1;
+}
+.hamburger-btn:hover { color: var(--text-primary); }
+
+/* ── Overlay (mobile) ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 999;
+}
+
+/* ── Summary cards ── */
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.25rem 1.5rem;
+  transition: transform .15s, box-shadow .15s;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,.15); }
+.stat-value { font-size: 1.75rem; font-weight: 700; letter-spacing: -.5px; color: var(--text-primary); }
+.stat-label { font-size: .8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.stat-icon { font-size: 2rem; opacity: .2; }
+.profit { color: var(--green-bright); }
+.loss   { color: #f85149; }
+
+/* ── Filter bar ── */
+.filter-btn {
+  border-radius: 20px; padding: .35rem 1rem; font-size: .85rem;
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  transition: all .15s;
+}
+.filter-btn:hover { border-color: #555; color: var(--text-primary); }
+.filter-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.filter-btn[data-filter="KEEP"].active   { background: #2ea043; border-color: #2ea043; }
+.filter-btn[data-filter="REVIEW"].active { background: #9a6700; border-color: #9a6700; }
+.filter-btn[data-filter="DILUTE"].active,
+.filter-btn[data-filter="EXIT"].active   { background: #b91c1c; border-color: #b91c1c; }
+
+/* ── SIP / Stock cards ── */
+.sip-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+  transition: transform .15s, box-shadow .15s;
+}
+.sip-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+.sip-card-header { padding: .9rem 1.2rem; border-bottom: 1px solid var(--border); }
+.sip-card-body   { padding: 1rem 1.2rem; }
+
+.status-bar { height: 4px; }
+.status-KEEP       { background: var(--green); }
+.status-REVIEW     { background: var(--yellow); }
+.status-DILUTE     { background: var(--red); }
+.status-EXIT       { background: #6e3838; }
+.status-TOO_EARLY  { background: #555; }
+.status-ACCUMULATE { background: var(--green); }
+.status-BOOK_PARTIAL { background: var(--yellow); }
+.status-HOLD       { background: var(--blue); }
+.status-NO_DATA    { background: #555; }
+
+.metric-row { display: flex; justify-content: space-between; font-size: .82rem; padding: .25rem 0; border-bottom: 1px solid var(--border); opacity: .9; }
+.metric-row:last-child { border-bottom: none; }
+.metric-label { color: var(--text-muted); }
+.metric-value { font-weight: 600; color: var(--text-primary); }
+
+.xirr-badge { font-size: 1.1rem; font-weight: 700; padding: .3rem .75rem; border-radius: 8px; }
+
+.rec-box { border-radius: 8px; padding: .65rem .9rem; font-size: .8rem; margin-top: .75rem; }
+.rec-KEEP        { background: rgba(46,160,67,.15);  border: 1px solid rgba(46,160,67,.3); }
+.rec-REVIEW      { background: rgba(210,153,34,.15); border: 1px solid rgba(210,153,34,.3); }
+.rec-DILUTE      { background: rgba(218,54,51,.15);  border: 1px solid rgba(218,54,51,.3); }
+.rec-EXIT        { background: rgba(110,56,56,.25);  border: 1px solid rgba(218,54,51,.4); }
+.rec-TOO_EARLY   { background: rgba(80,80,80,.2);    border: 1px solid #555; }
+.rec-HOLD        { background: rgba(31,111,235,.12); border: 1px solid rgba(31,111,235,.3); }
+.rec-NO_DATA     { background: rgba(80,80,80,.2);    border: 1px solid #555; }
+
+/* ── 52-week range bar ── */
+.range-wrap { margin: .6rem 0 .25rem; }
+.range-labels { display: flex; justify-content: space-between; font-size: .68rem; color: var(--text-muted); }
+.range-track { height: 6px; background: rgba(128,128,128,.2); border-radius: 3px; margin: .35rem 0; }
+.range-fill  { height: 100%; border-radius: 3px; transition: width .4s; }
+.range-low   { background: var(--green); }
+.range-mid   { background: var(--blue); }
+.range-high  { background: var(--red); }
+.range-pct-label { text-align: center; font-size: .7rem; color: var(--text-muted); }
+
+/* ── Chart section ── */
+.chart-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.25rem;
+}
+
+/* ── Loading overlay ── */
+#loadingOverlay {
+  position: fixed; inset: 0; background: rgba(13,15,20,.88);
+  display: flex; align-items: center; justify-content: center; z-index: 9999;
+}
+.spinner-ring {
+  width: 52px; height: 52px; border: 4px solid var(--border);
+  border-top-color: var(--blue); border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Modal ── */
+.modal-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; color: var(--text-primary); }
+.modal-header  { border-bottom: 1px solid var(--border); }
+.modal-footer  { border-top: 1px solid var(--border); }
+.form-control, .form-select {
+  background: var(--bg-main); border-color: var(--border); color: var(--text-primary);
+}
+.form-control:focus, .form-select:focus {
+  background: var(--bg-main); border-color: var(--blue); color: var(--text-primary);
+  box-shadow: 0 0 0 .2rem rgba(31,111,235,.25);
+}
+#searchResults { max-height: 240px; overflow-y: auto; background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; }
+.search-item { padding: .6rem .9rem; cursor: pointer; font-size: .85rem; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+.search-item:last-child { border-bottom: none; }
+.search-item:hover { background: rgba(31,111,235,.2); }
+
+/* ── View-only ribbon ── */
+.view-only-banner {
+  background: rgba(31,111,235,.1); border: 1px solid rgba(31,111,235,.25);
+  border-radius: 8px; padding: .5rem 1rem; font-size: .82rem; color: #79c0ff;
+  display: flex; align-items: center; gap: .5rem;
+}
+
+/* ── Utility ── */
+.text-green  { color: var(--green-bright) !important; }
+.text-yellow { color: #e3a008 !important; }
+.text-red    { color: #f85149 !important; }
+.empty-state { color: var(--text-muted); padding: 4rem 2rem; text-align: center; }
+.progress-thin { height: 6px; border-radius: 3px; }
+hr.divider { border-color: var(--border); opacity: 1; }
+.tab-content > .tab-pane { display: none; }
+.tab-content > .tab-pane.show { display: block; }
+.text-muted { color: var(--text-muted) !important; }
+
+/* ── Privacy mode ── */
+.private-val { transition: filter .2s ease; }
+body.privacy-mode .private-val {
+  filter: blur(7px);
+  user-select: none;
+  cursor: pointer;
+}
+
+/* ── Combined portfolio strip ── */
+#combinedOverview {
+  background: var(--bg-card2);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-240px);
+    width: 240px !important;
   }
-
-  body { background: var(--bg-main); font-family: 'Segoe UI', system-ui, sans-serif; }
-
-  /* ── Navbar ── */
-  .navbar { background: var(--bg-card) !important; border-bottom: 1px solid var(--border); }
-  .brand-icon { font-size: 1.4rem; margin-right: .4rem; }
-
-  /* ── Tab nav ── */
-  .main-tabs { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 1rem; }
-  .main-tabs .nav-link { color: var(--text-muted); border: none; border-bottom: 3px solid transparent;
-    padding: .65rem 1.1rem; font-size: .9rem; font-weight: 500; border-radius: 0; }
-  .main-tabs .nav-link.active { color: #e6edf3; border-bottom-color: var(--blue); background: none; }
-  .main-tabs .nav-link:hover:not(.active) { color: #e6edf3; border-bottom-color: #444; }
-
-  /* ── Summary cards ── */
-  .stat-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 1.25rem 1.5rem;
-    transition: transform .15s, box-shadow .15s;
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,.4);
   }
-  .stat-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,.4); }
-  .stat-value { font-size: 1.75rem; font-weight: 700; letter-spacing: -.5px; }
-  .stat-label { font-size: .8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
-  .stat-icon { font-size: 2rem; opacity: .25; }
-  .profit { color: var(--green-bright); }
-  .loss   { color: #f85149; }
+  .sidebar.mobile-open ~ .sidebar-overlay { display: block; }
+  .main-wrapper { margin-left: 0 !important; }
+  .hamburger-btn { display: flex !important; }
+  .stat-value { font-size: 1.3rem; }
+  .sip-card   { margin-bottom: .75rem; }
+}
 
-  /* ── Filter bar ── */
-  .filter-btn {
-    border-radius: 20px; padding: .35rem 1rem; font-size: .85rem;
-    background: transparent; border: 1px solid var(--border); color: #8b949e;
-    transition: all .15s;
-  }
-  .filter-btn:hover { border-color: #555; color: #e6edf3; }
-  .filter-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
-  .filter-btn[data-filter="KEEP"].active   { background: #2ea043; border-color: #2ea043; }
-  .filter-btn[data-filter="REVIEW"].active { background: #9a6700; border-color: #9a6700; }
-  .filter-btn[data-filter="DILUTE"].active,
-  .filter-btn[data-filter="EXIT"].active   { background: #b91c1c; border-color: #b91c1c; }
-
-  /* ── SIP / Stock cards ── */
-  .sip-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
-    transition: transform .15s, box-shadow .15s;
-  }
-  .sip-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,.5); }
-  .sip-card-header { padding: .9rem 1.2rem; border-bottom: 1px solid var(--border); }
-  .sip-card-body   { padding: 1rem 1.2rem; }
-
-  .status-bar { height: 4px; border-radius: 0; }
-  .status-KEEP       { background: var(--green); }
-  .status-REVIEW     { background: var(--yellow); }
-  .status-DILUTE     { background: var(--red); }
-  .status-EXIT       { background: #6e3838; }
-  .status-TOO_EARLY  { background: #555; }
-  .status-ACCUMULATE { background: var(--green); }
-  .status-BOOK_PARTIAL { background: var(--yellow); }
-  .status-HOLD       { background: var(--blue); }
-  .status-NO_DATA    { background: #555; }
-
-  .metric-row { display: flex; justify-content: space-between; font-size: .82rem; padding: .25rem 0; border-bottom: 1px solid rgba(255,255,255,.04); }
-  .metric-row:last-child { border-bottom: none; }
-  .metric-label { color: var(--text-muted); }
-  .metric-value { font-weight: 600; }
-
-  .xirr-badge { font-size: 1.1rem; font-weight: 700; padding: .3rem .75rem; border-radius: 8px; }
-
-  .rec-box { border-radius: 8px; padding: .65rem .9rem; font-size: .8rem; margin-top: .75rem; }
-  .rec-KEEP        { background: rgba(46,160,67,.15);  border: 1px solid rgba(46,160,67,.3); }
-  .rec-REVIEW      { background: rgba(210,153,34,.15); border: 1px solid rgba(210,153,34,.3); }
-  .rec-DILUTE      { background: rgba(218,54,51,.15);  border: 1px solid rgba(218,54,51,.3); }
-  .rec-EXIT        { background: rgba(110,56,56,.25);  border: 1px solid rgba(218,54,51,.4); }
-  .rec-TOO_EARLY   { background: rgba(80,80,80,.2);    border: 1px solid #555; }
-  .rec-HOLD        { background: rgba(31,111,235,.12); border: 1px solid rgba(31,111,235,.3); }
-  .rec-NO_DATA     { background: rgba(80,80,80,.2);    border: 1px solid #555; }
-
-  /* ── 52-week range bar ── */
-  .range-wrap { margin: .6rem 0 .25rem; }
-  .range-labels { display: flex; justify-content: space-between; font-size: .68rem; color: var(--text-muted); }
-  .range-track { height: 6px; background: rgba(255,255,255,.1); border-radius: 3px; margin: .35rem 0; position: relative; }
-  .range-fill  { height: 100%; border-radius: 3px; transition: width .4s; }
-  .range-low   { background: var(--green); }
-  .range-mid   { background: var(--blue); }
-  .range-high  { background: var(--red); }
-  .range-pct-label { text-align: center; font-size: .7rem; color: var(--text-muted); }
-
-  /* ── Chart section ── */
-  .chart-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 1.25rem;
-  }
-
-  /* ── Loading overlay ── */
-  #loadingOverlay {
-    position: fixed; inset: 0; background: rgba(13,15,20,.85);
-    display: flex; align-items: center; justify-content: center; z-index: 9999;
-  }
-  .spinner-ring {
-    width: 52px; height: 52px; border: 4px solid var(--border);
-    border-top-color: var(--blue); border-radius: 50%;
-    animation: spin .8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Modal ── */
-  .modal-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; }
-  .modal-header  { border-bottom: 1px solid var(--border); }
-  .modal-footer  { border-top: 1px solid var(--border); }
-  .form-control, .form-select {
-    background: var(--bg-main); border-color: var(--border); color: #e6edf3;
-  }
-  .form-control:focus, .form-select:focus {
-    background: var(--bg-main); border-color: var(--blue); color: #e6edf3;
-    box-shadow: 0 0 0 .2rem rgba(31,111,235,.25);
-  }
-  #searchResults { max-height: 240px; overflow-y: auto; background: #111418; border: 1px solid var(--border); border-radius: 8px; }
-  .search-item { padding: .6rem .9rem; cursor: pointer; font-size: .85rem; border-bottom: 1px solid var(--border); }
-  .search-item:last-child { border-bottom: none; }
-  .search-item:hover { background: rgba(31,111,235,.2); }
-
-  /* ── View-only ribbon ── */
-  .view-only-banner {
-    background: rgba(31,111,235,.1); border: 1px solid rgba(31,111,235,.25);
-    border-radius: 8px; padding: .5rem 1rem; font-size: .82rem; color: #79c0ff;
-    display: flex; align-items: center; gap: .5rem;
-  }
-
-  /* ── Utility ── */
-  .text-green  { color: var(--green-bright) !important; }
-  .text-yellow { color: #e3a008 !important; }
-  .text-red    { color: #f85149 !important; }
-  .empty-state { color: var(--text-muted); padding: 4rem 2rem; text-align: center; }
-  .progress-thin { height: 6px; border-radius: 3px; }
-  hr.divider { border-color: var(--border); opacity: 1; }
-  .tab-content > .tab-pane { display: none; }
-  .tab-content > .tab-pane.show { display: block; }
-
-  @media(max-width:576px) {
-    .stat-value { font-size: 1.3rem; }
-    .sip-card   { margin-bottom: .75rem; }
-  }
-
-  /* ── Privacy mode ── */
-  .private-val { transition: filter .2s ease; }
-  body.privacy-mode .private-val {
-    filter: blur(7px);
-    user-select: none;
-    cursor: pointer;
-  }
-  #privacyBtn { min-width: 34px; }
+/* ── Collapsed sidebar main ── */
+@media (min-width: 769px) {
+  .sidebar.collapsed ~ .sidebar-overlay ~ .main-wrapper { margin-left: 68px; }
+}
 </style>
 </head>
 <body>
@@ -184,82 +384,100 @@
   </div>
 </div>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg sticky-top">
-  <div class="container-fluid px-3 px-md-4">
-    <span class="navbar-brand fw-bold">
-      <span class="brand-icon">📈</span>SIP Tracker
-    </span>
-    <div class="ms-auto d-flex gap-2 align-items-center">
-      <span id="lastUpdated" class="text-muted small d-none d-md-inline"></span>
-      <button id="privacyBtn" class="btn btn-sm btn-outline-secondary" onclick="togglePrivacy()" title="Toggle value visibility">
-        <i id="privacyIcon" class="bi bi-eye-slash"></i>
+<div class="app-shell">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar" id="sidebar">
+  <!-- Brand -->
+  <div class="sidebar-brand">
+    <span class="brand-icon">📈</span>
+    <span class="brand-text">SIP Tracker</span>
+    <button class="collapse-btn" id="sidebarCollapseBtn" onclick="toggleSidebar()" title="Collapse sidebar">
+      <i class="bi bi-layout-sidebar-reverse" style="font-size:1.1rem"></i>
+    </button>
+  </div>
+
+  <!-- Nav -->
+  <nav class="sidebar-nav" id="sidebarNav">
+    <div class="sidebar-section">Portfolio</div>
+    <a class="sidebar-link active" data-target="mfPane" data-title="Mutual Funds" onclick="switchPane(this)">
+      <i class="bi bi-graph-up-arrow"></i><span>Mutual Funds</span>
+    </a>
+    <a class="sidebar-link" data-target="stocksPane" data-title="Stocks" onclick="switchPane(this)">
+      <i class="bi bi-bar-chart-line"></i><span>Stocks</span>
+    </a>
+    <hr class="sidebar-divider">
+    <div class="sidebar-section">Reports</div>
+    <a class="sidebar-link" data-target="taxPane" data-title="Tax Report" onclick="switchPane(this)">
+      <i class="bi bi-receipt"></i><span>Tax Report</span>
+    </a>
+    <a class="sidebar-link" data-target="historyPane" data-title="History" onclick="switchPane(this)">
+      <i class="bi bi-clock-history"></i><span>History</span>
+    </a>
+  </nav>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-row">
+      <button class="sidebar-footer-btn" onclick="togglePrivacy()" id="privacyBtn" title="Toggle value visibility">
+        <i id="privacyIcon" class="bi bi-eye-slash"></i><span>Privacy</span>
       </button>
-      <button class="btn btn-sm btn-outline-secondary" onclick="refreshActive(true)" title="Force refresh">
-        <i class="bi bi-arrow-clockwise"></i> Refresh
+      <button class="sidebar-footer-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle light/dark mode">
+        <i id="themeIcon" class="bi bi-sun"></i><span>Theme</span>
       </button>
-      {% if user %}
-      <div class="d-flex align-items-center gap-2 ms-1">
-        {% if user.picture %}
-        <img src="{{ user.picture }}" alt="{{ user.name }}" title="{{ user.name }}" width="30" height="30"
-             style="border-radius:50%;border:2px solid #30363d" referrerpolicy="no-referrer"/>
-        {% endif %}
-        <a href="/logout" class="btn btn-sm btn-outline-secondary" title="Sign out">
-          <i class="bi bi-box-arrow-right"></i>
-        </a>
-      </div>
+    </div>
+    <div class="sidebar-footer-row">
+      <span id="lastUpdated" class="text-muted" style="font-size:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
+      <button class="sidebar-footer-btn" onclick="refreshActive(true)" title="Force refresh">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+    </div>
+    {% if user %}
+    <div class="sidebar-user">
+      {% if user.picture %}
+      <img src="{{ user.picture }}" alt="{{ user.name }}" title="{{ user.name }}" referrerpolicy="no-referrer"/>
       {% endif %}
+      <span class="sidebar-user-name">{{ user.name }}</span>
+      <a href="/logout" class="sidebar-footer-btn ms-auto" title="Sign out" style="flex-shrink:0">
+        <i class="bi bi-box-arrow-right"></i>
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</aside>
+
+<!-- Mobile overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- ═══ MAIN WRAPPER ═══ -->
+<div class="main-wrapper" id="mainWrapper">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <button class="hamburger-btn" id="sidebarToggle" onclick="openSidebar()">
+      <i class="bi bi-list" style="font-size:1.4rem"></i>
+    </button>
+    <div class="topbar-title" id="topbarTitle">Mutual Funds</div>
+  </header>
+
+  <!-- Combined portfolio overview strip -->
+  <div id="combinedOverview" class="px-3 px-md-4 py-2" style="display:none">
+    <div class="d-flex gap-4 align-items-center flex-wrap">
+      <span class="text-muted fw-semibold" style="font-size:.72rem;letter-spacing:.06em">COMBINED PORTFOLIO</span>
+      <div><div class="fw-bold private-val" id="comb-value">—</div><div class="text-muted" style="font-size:.7rem">Total Value</div></div>
+      <div><div class="fw-bold private-val" id="comb-invested">—</div><div class="text-muted" style="font-size:.7rem">Invested</div></div>
+      <div><div class="fw-bold private-val" id="comb-pl">—</div><div class="text-muted" style="font-size:.7rem">P&amp;L</div></div>
+      <div><div class="fw-bold private-val" id="comb-pct">—</div><div class="text-muted" style="font-size:.7rem">Return</div></div>
     </div>
   </div>
-</nav>
 
-<!-- Tab nav -->
-<div class="main-tabs">
-  <ul class="nav" id="mainTabs" role="tablist">
-    <li class="nav-item">
-      <button class="nav-link active" id="mf-tab" data-bs-toggle="tab" data-bs-target="#mfPane" type="button"
-              onclick="onTabSwitch('mf')">
-        <i class="bi bi-graph-up-arrow me-1"></i>Mutual Funds
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="stocks-tab" data-bs-toggle="tab" data-bs-target="#stocksPane" type="button"
-              onclick="onTabSwitch('stocks')">
-        <i class="bi bi-bar-chart-line me-1"></i>Stocks
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="tax-tab" data-bs-toggle="tab" data-bs-target="#taxPane" type="button"
-              onclick="onTabSwitch('tax')">
-        <i class="bi bi-receipt me-1"></i>Tax Report
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#historyPane" type="button"
-              onclick="onTabSwitch('history')">
-        <i class="bi bi-clock-history me-1"></i>History
-      </button>
-    </li>
-  </ul>
-</div>
-
-<!-- Combined Portfolio Overview Strip (Feature 4) -->
-<div id="combinedOverview" class="container-fluid px-3 px-md-4 py-2" style="background:rgba(22,27,34,0.7);border-bottom:1px solid #30363d;display:none">
-  <div class="d-flex gap-4 align-items-center flex-wrap">
-    <span class="text-muted small fw-semibold" style="font-size:.75rem;letter-spacing:.05em">COMBINED PORTFOLIO</span>
-    <div><div class="fw-bold private-val" id="comb-value">—</div><div class="text-muted" style="font-size:.7rem">Total Value</div></div>
-    <div><div class="fw-bold private-val" id="comb-invested">—</div><div class="text-muted" style="font-size:.7rem">Invested</div></div>
-    <div><div class="fw-bold private-val" id="comb-pl">—</div><div class="text-muted" style="font-size:.7rem">P&amp;L</div></div>
-    <div><div class="fw-bold private-val" id="comb-pct">—</div><div class="text-muted" style="font-size:.7rem">Return</div></div>
-  </div>
-</div>
-
-<div class="tab-content">
+  <!-- Tab content -->
+  <div class="tab-content">
 
 <!-- ═══════════════════════════════════════════════════════════
      MUTUAL FUNDS TAB
 ═══════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade show active" id="mfPane" role="tabpanel">
+<div class="tab-pane show active" id="mfPane" role="tabpanel">
 <div class="container-fluid px-3 px-md-4 py-4">
 
   <!-- MF Import CTA -->
@@ -426,7 +644,7 @@
 <!-- ═══════════════════════════════════════════════════════════
      STOCKS TAB
 ═══════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade" id="stocksPane" role="tabpanel">
+<div class="tab-pane" id="stocksPane" role="tabpanel">
 <div class="container-fluid px-3 px-md-4 py-4">
 
   <!-- Stocks summary cards -->
@@ -574,7 +792,7 @@
 <!-- ═══════════════════════════════════════════════════════════
      TAX REPORT TAB (Feature 6)
 ═══════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade" id="taxPane" role="tabpanel">
+<div class="tab-pane" id="taxPane" role="tabpanel">
 <div class="container-fluid px-3 px-md-4 py-4">
   <div class="d-flex align-items-center gap-3 mb-4">
     <div>
@@ -600,7 +818,7 @@
 <!-- ═══════════════════════════════════════════════════════════
      HISTORY TAB (Feature 7)
 ═══════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade" id="historyPane" role="tabpanel">
+<div class="tab-pane" id="historyPane" role="tabpanel">
 <div class="container-fluid px-3 px-md-4 py-4">
   <div class="d-flex align-items-center justify-content-between gap-3 mb-4 flex-wrap">
     <div>
@@ -626,6 +844,9 @@
 </div><!-- /historyPane -->
 
 </div><!-- /tab-content -->
+
+</div><!-- /main-wrapper -->
+</div><!-- /app-shell -->
 
 
 <!-- ══ Add SIP Modal ══ -->
@@ -1993,6 +2214,79 @@ function togglePrivacy() {
 }
 // Apply saved preference on load (default: hidden)
 applyPrivacy(localStorage.getItem('privacyMode') !== '0');
+
+// ── Sidebar navigation (replaces Bootstrap tabs) ─────────────────────────────
+function switchPane(linkEl) {
+  // Update active link
+  document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+  linkEl.classList.add('active');
+  // Update topbar title
+  const title = linkEl.dataset.title || '';
+  document.getElementById('topbarTitle').textContent = title;
+  // Show correct pane
+  const target = linkEl.dataset.target;
+  document.querySelectorAll('.tab-pane').forEach(p => { p.classList.remove('show','active'); });
+  const pane = document.getElementById(target);
+  if (pane) pane.classList.add('show','active');
+  // Close sidebar on mobile
+  if (window.innerWidth <= 768) closeSidebar();
+  // Trigger onTabSwitch logic
+  const tabMap = { mfPane:'mf', stocksPane:'stocks', taxPane:'tax', historyPane:'history' };
+  if (tabMap[target]) onTabSwitch(tabMap[target]);
+}
+
+// ── Sidebar collapse (desktop) ────────────────────────────────────────────────
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const collapsed = sb.classList.toggle('collapsed');
+  localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+  updateMainWrapperMargin();
+}
+function updateMainWrapperMargin() {
+  const sb = document.getElementById('sidebar');
+  const mw = document.getElementById('mainWrapper');
+  if (window.innerWidth > 768) {
+    mw.style.marginLeft = sb.classList.contains('collapsed') ? '68px' : '240px';
+  } else {
+    mw.style.marginLeft = '0';
+  }
+}
+
+// ── Sidebar mobile open/close ─────────────────────────────────────────────────
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('mobile-open');
+  document.getElementById('sidebarOverlay').style.display = 'block';
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebarOverlay').style.display = 'none';
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+}
+
+// ── Init sidebar + theme on load ─────────────────────────────────────────────
+(function initLayout() {
+  // Theme
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  applyTheme(savedTheme);
+  // Sidebar collapsed state
+  if (window.innerWidth > 768 && localStorage.getItem('sidebarCollapsed') === '1') {
+    document.getElementById('sidebar').classList.add('collapsed');
+  }
+  updateMainWrapperMargin();
+  window.addEventListener('resize', updateMainWrapperMargin);
+})();
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 refreshDashboard(false);
