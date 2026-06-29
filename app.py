@@ -1201,6 +1201,139 @@ def api_import_groww_stocks():
     return jsonify({"success": True, "added": added, "updated": updated, "total": len(parsed)})
 
 
+# ---------------------------------------------------------------------------
+# Feature 5: Nifty 50 benchmark
+# ---------------------------------------------------------------------------
+
+def fetch_nifty_data():
+    try:
+        import yfinance as yf
+        t = yf.Ticker("^NSEI")
+        hist = t.history(period="366d")
+        if len(hist) >= 50:
+            current = float(hist['Close'].iloc[-1])
+            year_ago = float(hist['Close'].iloc[0])
+            return_1y = round((current - year_ago) / year_ago * 100, 2)
+            return {"current": round(current, 2), "return_1y": return_1y}
+    except Exception:
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Feature 6: Tax P&L summary
+# ---------------------------------------------------------------------------
+
+def calc_tax_summary(stocks_with_recs):
+    today = date.today()
+    stcg_positions, ltcg_positions = [], []
+    for r in stocks_with_recs:
+        pnl = r["recommendation"].get("pnl_abs", 0)
+        invested = r["recommendation"].get("invested", 0)
+        if pnl <= 0 or invested <= 0:
+            continue
+        try:
+            buy_date = datetime.fromisoformat(r.get("created_at", "")).date()
+        except Exception:
+            continue
+        holding_days = (today - buy_date).days
+        entry = {
+            "name": r.get("company_name") or r.get("symbol", ""),
+            "symbol": r.get("symbol", ""),
+            "pnl": round(pnl, 2),
+            "holding_days": holding_days,
+            "pnl_pct": r["recommendation"].get("pnl_pct", 0),
+        }
+        if holding_days < 365:
+            stcg_positions.append(entry)
+        else:
+            ltcg_positions.append(entry)
+    stcg_total = sum(p["pnl"] for p in stcg_positions)
+    ltcg_total = sum(p["pnl"] for p in ltcg_positions)
+    stcg_tax = round(stcg_total * 0.20, 2)
+    ltcg_exempt = 125000
+    ltcg_taxable = max(0, ltcg_total - ltcg_exempt)
+    ltcg_tax = round(ltcg_taxable * 0.125, 2)
+    return {
+        "stcg_profit": round(stcg_total, 2),
+        "stcg_tax": stcg_tax,
+        "ltcg_profit": round(ltcg_total, 2),
+        "ltcg_tax": ltcg_tax,
+        "ltcg_exempt": ltcg_exempt,
+        "total_tax": round(stcg_tax + ltcg_tax, 2),
+        "stcg_positions": sorted(stcg_positions, key=lambda x: -x["pnl"]),
+        "ltcg_positions": sorted(ltcg_positions, key=lambda x: -x["pnl"]),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Feature 7: Portfolio history snapshots
+# NOTE: Run the following SQL in Supabase to create the required table:
+#
+# CREATE TABLE portfolio_snapshots (
+#   user_email TEXT NOT NULL,
+#   snapshot_date DATE NOT NULL,
+#   mf_invested FLOAT DEFAULT 0,
+#   mf_current FLOAT DEFAULT 0,
+#   stocks_invested FLOAT DEFAULT 0,
+#   stocks_current FLOAT DEFAULT 0,
+#   PRIMARY KEY (user_email, snapshot_date)
+# );
+# ---------------------------------------------------------------------------
+
+def load_snapshots():
+    if USE_SUPABASE:
+        res = _sb.table('portfolio_snapshots').select('*').eq('user_email', _get_email()).order('snapshot_date').execute()
+        return res.data
+    path = os.path.join(DATA_DIR, _get_email().replace('@', '_at_').replace('.', '_'), 'snapshots.json')
+    return json.load(open(path)) if os.path.exists(path) else []
+
+
+def save_snapshot(snap):
+    if USE_SUPABASE:
+        _sb.table('portfolio_snapshots').upsert({
+            'user_email': _get_email(),
+            'snapshot_date': snap['snapshot_date'],
+            'mf_invested': snap.get('mf_invested', 0),
+            'mf_current': snap.get('mf_current', 0),
+            'stocks_invested': snap.get('stocks_invested', 0),
+            'stocks_current': snap.get('stocks_current', 0),
+        }).execute()
+        return
+    safe = _get_email().replace('@', '_at_').replace('.', '_')
+    path = os.path.join(DATA_DIR, safe, 'snapshots.json')
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    snaps = json.load(open(path)) if os.path.exists(path) else []
+    # upsert by date
+    snaps = [s for s in snaps if s.get('snapshot_date') != snap['snapshot_date']]
+    snaps.append(snap)
+    snaps.sort(key=lambda x: x['snapshot_date'])
+    with open(path, 'w') as f:
+        json.dump(snaps, f, indent=2)
+
+
+@app.route("/api/portfolio/snapshot", methods=["POST"])
+@login_required
+def api_portfolio_snapshot():
+    body = request.json or {}
+    today = date.today().isoformat()
+    save_snapshot({
+        "snapshot_date":   today,
+        "mf_invested":     body.get("mf_invested", 0),
+        "mf_current":      body.get("mf_current", 0),
+        "stocks_invested": body.get("stocks_invested", 0),
+        "stocks_current":  body.get("stocks_current", 0),
+    })
+    return jsonify({"success": True, "date": today})
+
+
+@app.route("/api/portfolio/history")
+@login_required
+def api_portfolio_history():
+    snaps = load_snapshots()
+    return jsonify({"snapshots": snaps[-90:]})  # last 90 days
+
+
 @app.route("/api/stocks/dashboard")
 @login_required
 def api_stocks_dashboard():
@@ -1236,6 +1369,8 @@ def api_stocks_dashboard():
             "count":              len(results),
             "status_counts":      status_counts,
             "last_updated":       datetime.now().strftime("%d %b %Y, %I:%M %p"),
+            "nifty":              fetch_nifty_data(),
+            "tax":                calc_tax_summary(results),
         }
     })
 

@@ -216,7 +216,30 @@
         <i class="bi bi-bar-chart-line me-1"></i>Stocks
       </button>
     </li>
+    <li class="nav-item">
+      <button class="nav-link" id="tax-tab" data-bs-toggle="tab" data-bs-target="#taxPane" type="button"
+              onclick="onTabSwitch('tax')">
+        <i class="bi bi-receipt me-1"></i>Tax Report
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#historyPane" type="button"
+              onclick="onTabSwitch('history')">
+        <i class="bi bi-clock-history me-1"></i>History
+      </button>
+    </li>
   </ul>
+</div>
+
+<!-- Combined Portfolio Overview Strip (Feature 4) -->
+<div id="combinedOverview" class="container-fluid px-3 px-md-4 py-2" style="background:rgba(22,27,34,0.7);border-bottom:1px solid #30363d;display:none">
+  <div class="d-flex gap-4 align-items-center flex-wrap">
+    <span class="text-muted small fw-semibold" style="font-size:.75rem;letter-spacing:.05em">COMBINED PORTFOLIO</span>
+    <div><div class="fw-bold" id="comb-value">—</div><div class="text-muted" style="font-size:.7rem">Total Value</div></div>
+    <div><div class="fw-bold" id="comb-invested">—</div><div class="text-muted" style="font-size:.7rem">Invested</div></div>
+    <div><div class="fw-bold" id="comb-pl">—</div><div class="text-muted" style="font-size:.7rem">P&amp;L</div></div>
+    <div><div class="fw-bold" id="comb-pct">—</div><div class="text-muted" style="font-size:.7rem">Return</div></div>
+  </div>
 </div>
 
 <div class="tab-content">
@@ -342,6 +365,22 @@
     </div>
   </div>
 
+  <!-- MF Import reminder banner (Feature 2) -->
+  <div id="mf-importBanner" class="alert mb-3 py-2 px-3 small d-flex align-items-center gap-2" style="display:none!important;background:rgba(210,153,34,.15);border:1px solid rgba(210,153,34,.4);border-radius:8px;color:#e3b341">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <span id="mf-importBannerText">Consider re-uploading your Groww Excel for fresh data.</span>
+  </div>
+
+  <!-- MF Sort controls (Feature 3) -->
+  <div class="d-flex gap-2 flex-wrap align-items-center mb-2" id="mf-sortBar" style="display:none">
+    <span class="text-muted small">Sort:</span>
+    <button class="btn btn-sm filter-btn" onclick="sortSips('xirr_desc')">Best XIRR</button>
+    <button class="btn btn-sm filter-btn" onclick="sortSips('xirr_asc')">Worst XIRR</button>
+    <button class="btn btn-sm filter-btn" onclick="sortSips('pl_desc')">Highest P&amp;L</button>
+    <button class="btn btn-sm filter-btn" onclick="sortSips('pl_asc')">Lowest P&amp;L</button>
+    <button class="btn btn-sm filter-btn" onclick="sortSips('value_desc')">Highest Value</button>
+  </div>
+
   <!-- Filter bar -->
   <div class="d-flex gap-2 flex-wrap align-items-center mb-3" id="filterBar" style="display:none">
     <button class="btn btn-sm filter-btn active" data-filter="ALL" onclick="filterSips('ALL',this)">
@@ -428,6 +467,35 @@
         <div class="mt-2 text-muted small" id="stk-lastUpdated"></div>
       </div>
     </div>
+    <!-- Feature 5: Nifty 50 Benchmark card -->
+    <div class="col-12 col-lg">
+      <div class="stat-card">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="stat-label">Nifty 50 Benchmark</div>
+            <div class="stat-value" id="stk-niftyLevel" style="font-size:1.4rem">—</div>
+          </div>
+          <i class="bi bi-graph-up-arrow stat-icon"></i>
+        </div>
+        <div class="mt-2 small" id="stk-niftyReturn">—</div>
+        <div class="mt-1 small" id="stk-vsNifty"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feature 1: Sector Allocation chart -->
+  <div class="chart-card mb-4" id="sectorChartSection" style="display:none">
+    <div class="fw-semibold mb-3">Sector Allocation</div>
+    <div class="row align-items-center">
+      <div class="col-md-5"><canvas id="sectorChart" height="240"></canvas></div>
+      <div class="col-md-7" id="sectorLegend"></div>
+    </div>
+  </div>
+
+  <!-- Feature 2: Stocks import reminder banner -->
+  <div id="stk-importBanner" class="alert mb-3 py-2 px-3 small d-flex align-items-center gap-2" style="display:none!important;background:rgba(210,153,34,.15);border:1px solid rgba(210,153,34,.4);border-radius:8px;color:#e3b341">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <span id="stk-importBannerText">Consider re-uploading your Groww Stocks Excel for fresh data.</span>
   </div>
 
   <!-- Stocks actions bar -->
@@ -447,6 +515,15 @@
       </button>
       {% endif %}
     </div>
+  </div>
+
+  <!-- Stocks sort controls (Feature 3) -->
+  <div class="d-flex gap-2 flex-wrap align-items-center mb-2" id="stk-sortBar" style="display:none">
+    <span class="text-muted small">Sort:</span>
+    <button class="btn btn-sm filter-btn" onclick="sortStocks('pl_pct_desc')">Best P&amp;L %</button>
+    <button class="btn btn-sm filter-btn" onclick="sortStocks('pl_pct_asc')">Worst P&amp;L %</button>
+    <button class="btn btn-sm filter-btn" onclick="sortStocks('value_desc')">Highest Value</button>
+    <button class="btn btn-sm filter-btn" onclick="sortStocks('alpha')">A-Z</button>
   </div>
 
   <!-- Stock filter bar -->
@@ -481,6 +558,60 @@
 
 </div>
 </div><!-- /stocksPane -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAX REPORT TAB (Feature 6)
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="taxPane" role="tabpanel">
+<div class="container-fluid px-3 px-md-4 py-4">
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <div>
+      <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2"></i>Tax P&amp;L Report</h5>
+      <div class="text-muted small">Budget 2024 rates · STCG 20% · LTCG 12.5% (₹1.25L exempt)</div>
+    </div>
+  </div>
+
+  <div id="taxContent">
+    <div class="text-muted small py-5 text-center">
+      <i class="bi bi-hourglass-split" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.4"></i>
+      Load the Stocks tab first to compute tax data.
+    </div>
+  </div>
+
+  <div class="alert mt-4 py-2 px-3 small" style="background:rgba(31,111,235,.1);border:1px solid rgba(31,111,235,.25);border-radius:8px;color:#79c0ff">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>Disclaimer:</strong> Holding period is estimated from the date first added to this tracker — not your actual purchase date. Use Groww's P&amp;L Statement for actual tax filing.
+  </div>
+</div>
+</div><!-- /taxPane -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     HISTORY TAB (Feature 7)
+═══════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="historyPane" role="tabpanel">
+<div class="container-fluid px-3 px-md-4 py-4">
+  <div class="d-flex align-items-center justify-content-between gap-3 mb-4 flex-wrap">
+    <div>
+      <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>Portfolio History</h5>
+      <div class="text-muted small">Daily snapshots saved automatically · last 90 days</div>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" onclick="loadHistoryTab()">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+
+  <div class="chart-card mb-4" id="historyChartSection" style="display:none">
+    <div class="fw-semibold mb-3">Portfolio Value Over Time</div>
+    <canvas id="historyChart" height="260"></canvas>
+  </div>
+
+  <div id="historyEmpty" class="text-muted text-center py-5">
+    <i class="bi bi-graph-up" style="font-size:2.5rem;display:block;margin-bottom:1rem;opacity:.3"></i>
+    <div class="fw-semibold mb-1">No history yet</div>
+    <div class="small">Snapshots are saved automatically each time you load the dashboard. Check back tomorrow!</div>
+  </div>
+</div>
+</div><!-- /historyPane -->
 
 </div><!-- /tab-content -->
 
@@ -666,11 +797,18 @@ let activeFilter      = 'ALL';
 let activeStockFilter = 'ALL';
 let activeTab         = 'mf';
 let stocksLoaded      = false;
-let searchTimer    = null;
-let allocationChart = null;
-let xirrChart       = null;
+let searchTimer       = null;
+let allocationChart   = null;
+let xirrChart         = null;
+let sectorChart       = null;
+let historyChart      = null;
 let pendingDeleteId   = null;
 let pendingDeleteType = null;
+let taxData           = null;
+let mfSummaryData     = null;
+let stkSummaryData    = null;
+let snapshotSaved     = false;
+let historyLoaded     = false;
 
 const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
 
@@ -690,6 +828,10 @@ function onTabSwitch(tab) {
   activeTab = tab;
   if (tab === 'stocks' && !stocksLoaded) {
     loadStocksTab();
+  } else if (tab === 'tax') {
+    if (taxData) renderTaxReport(taxData);
+  } else if (tab === 'history') {
+    loadHistoryTab();
   }
 }
 
@@ -697,9 +839,63 @@ function refreshActive(force = false) {
   if (activeTab === 'stocks') {
     if (force) clearStockCache();
     loadStocksTab(true);
+  } else if (activeTab === 'tax') {
+    // tax data comes from stocks — reload stocks
+    stocksLoaded = false;
+    loadStocksTab(false);
+  } else if (activeTab === 'history') {
+    loadHistoryTab();
   } else {
     refreshDashboard(force);
   }
+}
+
+// ── Feature 4: Combined Portfolio Overview ──────────────────────────────────
+function updateCombinedOverview() {
+  if (!mfSummaryData && !stkSummaryData) return;
+
+  const strip = document.getElementById('combinedOverview');
+  strip.style.display = '';
+
+  const mfInv  = mfSummaryData  ? (mfSummaryData.total_invested || 0) : 0;
+  const mfCur  = mfSummaryData  ? (mfSummaryData.total_current  || 0) : 0;
+  const stkInv = stkSummaryData ? (stkSummaryData.total_invested || 0) : 0;
+  const stkCur = stkSummaryData ? (stkSummaryData.total_current  || 0) : 0;
+
+  const totalInv = mfInv + stkInv;
+  const totalCur = mfCur + stkCur;
+  const totalPL  = totalCur - totalInv;
+  const retPct   = totalInv > 0 ? (totalPL / totalInv * 100) : 0;
+
+  document.getElementById('comb-value').textContent    = fmt(totalCur);
+  document.getElementById('comb-invested').textContent = fmt(totalInv);
+
+  const plEl = document.getElementById('comb-pl');
+  plEl.textContent  = (totalPL >= 0 ? '+' : '-') + fmt(totalPL);
+  plEl.className    = 'fw-bold ' + colorCls(totalPL);
+
+  const pctEl = document.getElementById('comb-pct');
+  pctEl.textContent = fmtPct(retPct);
+  pctEl.className   = 'fw-bold ' + colorCls(totalPL);
+}
+
+// ── Feature 7: Snapshot save ────────────────────────────────────────────────
+async function maybeSaveSnapshot() {
+  if (snapshotSaved) return;
+  if (!mfSummaryData || !stkSummaryData) return;
+  snapshotSaved = true;
+  try {
+    await fetch('/api/portfolio/snapshot', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        mf_invested:     mfSummaryData.total_invested  || 0,
+        mf_current:      mfSummaryData.total_current   || 0,
+        stocks_invested: stkSummaryData.total_invested || 0,
+        stocks_current:  stkSummaryData.total_current  || 0,
+      })
+    });
+  } catch(e) { /* non-critical */ }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -717,18 +913,56 @@ async function refreshDashboard(forceRefresh = false) {
     const res  = await fetch('/api/dashboard');
     const data = await res.json();
     allSips = data.sips;
+    mfSummaryData = data.summary;
     renderSummary(data.summary);
     renderSips(allSips);
     renderCharts(allSips);
     renderCategoryBreakdown(allSips);
     document.getElementById('lastUpdated').textContent = 'Updated ' + data.summary.last_updated;
     document.getElementById('filterBar').style.display = '';
+    document.getElementById('mf-sortBar').style.display = '';
     document.getElementById('chartsSection').style.display = '';
+    // Feature 2: MF import banner
+    checkMfImportBanner(allSips);
+    // Feature 4: update combined view
+    updateCombinedOverview();
+    // Feature 7: save snapshot when both ready
+    maybeSaveSnapshot();
+    // Load stocks in background for combined overview
+    if (!stocksLoaded) {
+      loadStocksInBackground();
+    }
   } catch (e) {
     console.error(e);
   } finally {
     hideLoading();
   }
+}
+
+// Load stocks silently in background for combined overview (Feature 4)
+async function loadStocksInBackground() {
+  try {
+    const res  = await fetch('/api/stocks/dashboard');
+    const data = await res.json();
+    allStocks     = data.stocks;
+    stkSummaryData = data.summary;
+    taxData       = data.summary.tax || null;
+    stocksLoaded  = true;
+    updateCombinedOverview();
+    maybeSaveSnapshot();
+    // If user is already on stocks tab, render it
+    if (activeTab === 'stocks') {
+      renderStocksSummary(data.summary);
+      renderStocks(allStocks);
+      renderSectorChart(allStocks);
+      checkStkImportBanner(allStocks);
+      document.getElementById('stk-lastUpdated').textContent = 'Updated ' + data.summary.last_updated;
+      document.getElementById('stk-sortBar').style.display = '';
+    }
+    if (activeTab === 'tax' && taxData) {
+      renderTaxReport(taxData);
+    }
+  } catch(e) { /* silent */ }
 }
 
 function renderSummary(s) {
@@ -758,9 +992,44 @@ function renderSummary(s) {
   document.getElementById('cnt-EXIT').textContent   = sc['EXIT']   || 0;
 }
 
+// ── Feature 2: MF import banner ─────────────────────────────────────────────
+function checkMfImportBanner(sips) {
+  const banner = document.getElementById('mf-importBanner');
+  const text   = document.getElementById('mf-importBannerText');
+  if (!sips || !sips.length) { banner.style.display = 'none'; return; }
+  const dates = sips.map(s => s.groww_last_import).filter(Boolean).sort();
+  if (!dates.length) {
+    text.textContent = 'No import date found — consider uploading your Groww Excel for fresh data.';
+    banner.style.removeProperty('display');
+    return;
+  }
+  const latest   = new Date(dates[dates.length - 1]);
+  const diffDays = Math.floor((Date.now() - latest.getTime()) / 86400000);
+  if (diffDays > 7) {
+    text.textContent = `Last imported ${diffDays} day${diffDays===1?'':'s'} ago — consider re-uploading your Groww Excel for fresh data.`;
+    banner.style.removeProperty('display');
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── Feature 3: MF sort ───────────────────────────────────────────────────────
+function sortSips(field) {
+  const sorted = [...allSips];
+  if (field === 'xirr_desc') sorted.sort((a,b) => ((b.performance||{}).xirr||0) - ((a.performance||{}).xirr||0));
+  else if (field === 'xirr_asc')  sorted.sort((a,b) => ((a.performance||{}).xirr||0) - ((b.performance||{}).xirr||0));
+  else if (field === 'pl_desc')   sorted.sort((a,b) => ((b.performance||{}).profit_loss||0) - ((a.performance||{}).profit_loss||0));
+  else if (field === 'pl_asc')    sorted.sort((a,b) => ((a.performance||{}).profit_loss||0) - ((b.performance||{}).profit_loss||0));
+  else if (field === 'value_desc') sorted.sort((a,b) => ((b.performance||{}).current_value||0) - ((a.performance||{}).current_value||0));
+  // Update active sort button styling
+  document.querySelectorAll('#mf-sortBar .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderSips(sorted);
+}
+
 function filterSips(filter, btn) {
   activeFilter = filter;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#filterBar .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderSips(allSips);
 }
@@ -1171,11 +1440,18 @@ async function loadStocksTab(force = false) {
   try {
     const res  = await fetch('/api/stocks/dashboard');
     const data = await res.json();
-    allStocks = data.stocks;
+    allStocks      = data.stocks;
+    stkSummaryData = data.summary;
+    taxData        = data.summary.tax || null;
     renderStocksSummary(data.summary);
     renderStocks(allStocks);
+    renderSectorChart(allStocks);
+    checkStkImportBanner(allStocks);
     document.getElementById('stk-lastUpdated').textContent = 'Updated ' + data.summary.last_updated;
-    document.getElementById('lastUpdated').textContent = 'Updated ' + data.summary.last_updated;
+    document.getElementById('lastUpdated').textContent     = 'Updated ' + data.summary.last_updated;
+    document.getElementById('stk-sortBar').style.display  = '';
+    updateCombinedOverview();
+    maybeSaveSnapshot();
   } catch(e) {
     console.error(e);
   } finally {
@@ -1220,6 +1496,19 @@ function renderStocksSummary(s) {
   document.getElementById('scnt-REVIEW').textContent      = sc['REVIEW']       || 0;
   document.getElementById('scnt-EXIT').textContent        = sc['EXIT']         || 0;
   document.getElementById('stkFilterBar').style.display   = '';
+
+  // Feature 5: Nifty 50 benchmark card
+  if (s.nifty) {
+    document.getElementById('stk-niftyLevel').textContent = '₹' + s.nifty.current.toLocaleString('en-IN');
+    const nr = s.nifty.return_1y;
+    document.getElementById('stk-niftyReturn').innerHTML =
+      `1Y: <span class="${nr>=0?'text-green':'text-red'}">${nr>=0?'+':''}${nr}%</span>`;
+    const portReturn = s.overall_return_pct || 0;
+    const diff = (portReturn - nr).toFixed(1);
+    document.getElementById('stk-vsNifty').innerHTML = diff >= 0
+      ? `<span class="text-green">▲ Beating Nifty by ${diff}%</span>`
+      : `<span class="text-red">▼ Lagging Nifty by ${Math.abs(diff)}%</span>`;
+  }
 }
 
 function filterStocks(filter, btn) {
@@ -1227,6 +1516,257 @@ function filterStocks(filter, btn) {
   document.querySelectorAll('[data-stkfilter]').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderStocks(allStocks);
+}
+
+// ── Feature 2: Stocks import banner ─────────────────────────────────────────
+function checkStkImportBanner(stocks) {
+  const banner = document.getElementById('stk-importBanner');
+  const text   = document.getElementById('stk-importBannerText');
+  if (!stocks || !stocks.length) { banner.style.display = 'none'; return; }
+  const dates = stocks.map(s => s.groww_last_import).filter(Boolean).sort();
+  if (!dates.length) {
+    text.textContent = 'No import date found — consider uploading your Groww Stocks Excel for fresh data.';
+    banner.style.removeProperty('display');
+    return;
+  }
+  const latest   = new Date(dates[dates.length - 1]);
+  const diffDays = Math.floor((Date.now() - latest.getTime()) / 86400000);
+  if (diffDays > 7) {
+    text.textContent = `Last imported ${diffDays} day${diffDays===1?'':'s'} ago — consider re-uploading your Groww Stocks Excel for fresh data.`;
+    banner.style.removeProperty('display');
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── Feature 3: Stocks sort ───────────────────────────────────────────────────
+function sortStocks(field) {
+  const sorted = [...allStocks];
+  if (field === 'pl_pct_desc') sorted.sort((a,b) => ((b.recommendation||{}).pnl_pct||0) - ((a.recommendation||{}).pnl_pct||0));
+  else if (field === 'pl_pct_asc')  sorted.sort((a,b) => ((a.recommendation||{}).pnl_pct||0) - ((b.recommendation||{}).pnl_pct||0));
+  else if (field === 'value_desc')  sorted.sort((a,b) => ((b.recommendation||{}).current_value||0) - ((a.recommendation||{}).current_value||0));
+  else if (field === 'alpha')       sorted.sort((a,b) => (a.symbol||'').localeCompare(b.symbol||''));
+  document.querySelectorAll('#stk-sortBar .filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderStocks(sorted);
+}
+
+// ── Feature 1: Sector Allocation Chart ──────────────────────────────────────
+function renderSectorChart(stocks) {
+  const section = document.getElementById('sectorChartSection');
+  if (!stocks || !stocks.length) { section.style.display = 'none'; return; }
+
+  // Aggregate by sector
+  const sectors = {};
+  for (const s of stocks) {
+    const sector = (s.sector || 'Other').trim() || 'Other';
+    const val = s.groww_current_value || (s.recommendation && s.recommendation.current_value) || 0;
+    sectors[sector] = (sectors[sector] || 0) + val;
+  }
+
+  const entries = Object.entries(sectors).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
+  if (!entries.length) { section.style.display = 'none'; return; }
+
+  section.style.display = '';
+
+  const labels = entries.map(([k]) => k);
+  const values = entries.map(([,v]) => v);
+  const total  = values.reduce((a,b) => a+b, 0);
+  const colors = CHART_COLORS.slice(0, entries.length);
+
+  const ctx = document.getElementById('sectorChart').getContext('2d');
+  if (sectorChart) sectorChart.destroy();
+  sectorChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderColor: '#0d0f14',
+        borderWidth: 3,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      cutout: '60%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const v = ctx.parsed;
+          return ` ${fmt(v)} (${(v/total*100).toFixed(1)}%)`;
+        }}}
+      }
+    }
+  });
+
+  // Custom legend
+  document.getElementById('sectorLegend').innerHTML = entries.map(([name, val], i) => `
+    <div class="d-flex align-items-center justify-content-between mb-2" style="font-size:.82rem">
+      <div class="d-flex align-items-center gap-2">
+        <div style="width:10px;height:10px;border-radius:50%;background:${colors[i]};flex-shrink:0"></div>
+        <span>${escHtml(name)}</span>
+      </div>
+      <div class="text-end">
+        <span class="fw-semibold">${fmt(val)}</span>
+        <span class="text-muted ms-2" style="font-size:.75rem">${(val/total*100).toFixed(1)}%</span>
+      </div>
+    </div>`).join('');
+}
+
+// ── Feature 6: Tax Report ───────────────────────────────────────────────────
+function renderTaxReport(tax) {
+  if (!tax) return;
+  const el = document.getElementById('taxContent');
+
+  const stcgRows = (tax.stcg_positions || []).map(p => `
+    <tr style="border-color:var(--border)">
+      <td>${escHtml(p.name)}</td>
+      <td class="text-muted">${escHtml(p.symbol)}</td>
+      <td class="text-end text-green fw-semibold">+${fmt(p.pnl)}</td>
+      <td class="text-end text-muted">${p.holding_days}d</td>
+      <td class="text-end text-green">${p.pnl_pct >= 0 ? '+' : ''}${p.pnl_pct.toFixed(1)}%</td>
+    </tr>`).join('') || `<tr><td colspan="5" class="text-muted text-center py-3">No short-term gains</td></tr>`;
+
+  const ltcgRows = (tax.ltcg_positions || []).map(p => `
+    <tr style="border-color:var(--border)">
+      <td>${escHtml(p.name)}</td>
+      <td class="text-muted">${escHtml(p.symbol)}</td>
+      <td class="text-end text-green fw-semibold">+${fmt(p.pnl)}</td>
+      <td class="text-end text-muted">${Math.floor(p.holding_days/365)}y ${p.holding_days%365}d</td>
+      <td class="text-end text-green">${p.pnl_pct >= 0 ? '+' : ''}${p.pnl_pct.toFixed(1)}%</td>
+    </tr>`).join('') || `<tr><td colspan="5" class="text-muted text-center py-3">No long-term gains</td></tr>`;
+
+  el.innerHTML = `
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="stat-card">
+          <div class="stat-label">Short-Term Gains (STCG)</div>
+          <div class="stat-value text-green mt-1">${fmt(tax.stcg_profit)}</div>
+          <div class="mt-2 small text-muted">Tax @ 20% = <span class="text-red fw-semibold">${fmt(tax.stcg_tax)}</span></div>
+          <div class="mt-1 small text-muted">Holding &lt; 1 year</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="stat-card">
+          <div class="stat-label">Long-Term Gains (LTCG)</div>
+          <div class="stat-value text-green mt-1">${fmt(tax.ltcg_profit)}</div>
+          <div class="mt-2 small text-muted">Exempt: ${fmt(tax.ltcg_exempt)} · Taxable: ${fmt(Math.max(0, tax.ltcg_profit - tax.ltcg_exempt))}</div>
+          <div class="mt-1 small text-muted">Tax @ 12.5% = <span class="text-red fw-semibold">${fmt(tax.ltcg_tax)}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card mb-4" style="border-color:rgba(218,54,51,.3)">
+      <div class="d-flex justify-content-between align-items-center">
+        <div><div class="stat-label">Total Estimated Tax Liability</div>
+          <div class="stat-value text-red mt-1">${fmt(tax.total_tax)}</div>
+        </div>
+        <i class="bi bi-calculator stat-icon"></i>
+      </div>
+    </div>
+
+    <h6 class="fw-semibold mb-3">Short-Term Positions (STCG · &lt; 1 year)</h6>
+    <div class="table-responsive mb-4">
+      <table class="table table-sm table-dark" style="font-size:.82rem">
+        <thead><tr style="color:var(--text-muted);border-color:var(--border)">
+          <th>Stock</th><th>Symbol</th><th class="text-end">Gain</th><th class="text-end">Held</th><th class="text-end">P&amp;L%</th>
+        </tr></thead>
+        <tbody style="border-color:var(--border)">${stcgRows}</tbody>
+      </table>
+    </div>
+
+    <h6 class="fw-semibold mb-3">Long-Term Positions (LTCG · &gt; 1 year)</h6>
+    <div class="table-responsive">
+      <table class="table table-sm table-dark" style="font-size:.82rem">
+        <thead><tr style="color:var(--text-muted);border-color:var(--border)">
+          <th>Stock</th><th>Symbol</th><th class="text-end">Gain</th><th class="text-end">Held</th><th class="text-end">P&amp;L%</th>
+        </tr></thead>
+        <tbody style="border-color:var(--border)">${ltcgRows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── Feature 7: Portfolio History ─────────────────────────────────────────────
+async function loadHistoryTab() {
+  if (historyLoaded) return;
+  historyLoaded = true;
+  try {
+    const res  = await fetch('/api/portfolio/history');
+    const data = await res.json();
+    const snaps = data.snapshots || [];
+
+    const empty   = document.getElementById('historyEmpty');
+    const section = document.getElementById('historyChartSection');
+
+    if (!snaps.length) {
+      section.style.display = 'none';
+      empty.style.display   = '';
+      return;
+    }
+    empty.style.display   = 'none';
+    section.style.display = '';
+
+    const labels   = snaps.map(s => s.snapshot_date);
+    const mfVals   = snaps.map(s => s.mf_current   || 0);
+    const stkVals  = snaps.map(s => s.stocks_current || 0);
+    const totalVals = snaps.map((s,i) => (s.mf_current||0) + (s.stocks_current||0));
+
+    const ctx = document.getElementById('historyChart').getContext('2d');
+    if (historyChart) historyChart.destroy();
+    historyChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Total Portfolio',
+            data: totalVals,
+            borderColor: '#388bfd',
+            backgroundColor: 'rgba(56,139,253,.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: snaps.length > 30 ? 0 : 3,
+            borderWidth: 2,
+          },
+          {
+            label: 'MF Value',
+            data: mfVals,
+            borderColor: '#2ea043',
+            backgroundColor: 'transparent',
+            tension: 0.3,
+            pointRadius: snaps.length > 30 ? 0 : 3,
+            borderWidth: 1.5,
+            borderDash: [4,3],
+          },
+          {
+            label: 'Stocks Value',
+            data: stkVals,
+            borderColor: '#8957e5',
+            backgroundColor: 'transparent',
+            tension: 0.3,
+            pointRadius: snaps.length > 30 ? 0 : 3,
+            borderWidth: 1.5,
+            borderDash: [4,3],
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#8b949e', font: { size: 11 } } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}` } }
+        },
+        scales: {
+          x: { ticks: { color: '#8b949e', font: { size: 10 }, maxTicksLimit: 12 }, grid: { color: 'rgba(255,255,255,.05)' } },
+          y: { ticks: { color: '#8b949e', callback: v => fmt(v) }, grid: { color: 'rgba(255,255,255,.05)' } }
+        }
+      }
+    });
+  } catch(e) {
+    console.error('History load failed', e);
+    historyLoaded = false;
+  }
 }
 
 function renderStocks(stocks) {
