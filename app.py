@@ -722,93 +722,133 @@ def parse_groww_excel(file_bytes):
 # Groww Stocks/Equity Excel parser
 # ---------------------------------------------------------------------------
 
+def _resolve_isin_to_symbol(isin):
+    """Resolve an Indian ISIN to its NSE ticker via Yahoo Finance search."""
+    try:
+        url = (
+            f'https://query2.finance.yahoo.com/v1/finance/search'
+            f'?q={isin}&lang=en-US&region=IN&quotesCount=6&newsCount=0'
+        )
+        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=6)
+        if r.status_code == 200:
+            for q in r.json().get('quotes', []):
+                sym = q.get('symbol', '')
+                if sym.endswith('.NS'):
+                    return sym[:-3]          # strip .NS suffix
+    except Exception:
+        pass
+    return None
+
+
 def parse_groww_stocks_excel(file_bytes):
-    """Parse Groww equity holdings .xlsx and return list of stock dicts."""
+    """Parse Groww Holdings Statement .xlsx and return list of stock dicts.
+
+    Handles the format:  Stock Name | ISIN | Quantity | Average buy price |
+                         Buy value  | Closing price | Closing value | Unrealised P&L
+    """
     try:
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     except Exception as e:
         raise ValueError(f"Cannot open Excel file: {e}")
 
     ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
 
-    # Find the header row — look for any row with stock-like column keywords
-    HEADER_KEYWORDS = ['symbol', 'script', 'company', 'isin', 'quantity', 'qty']
-    header_row_idx = None
-    for i, row in enumerate(ws.iter_rows(values_only=True), 1):
-        cells = [str(c).strip().lower() for c in row if c]
-        if any(any(kw in c for kw in HEADER_KEYWORDS) for c in cells):
-            header_row_idx = i
+    # Find header row: must contain both 'isin' and 'quantity' (case-insensitive)
+    header_idx = None
+    for i, row in enumerate(rows):
+        cells = [str(c).strip().lower() for c in row if c is not None]
+        if 'isin' in cells and any('quantity' in c or 'qty' in c for c in cells):
+            header_idx = i
             break
 
-    if not header_row_idx:
+    if header_idx is None:
         raise ValueError(
-            "Could not find a header row. Make sure this is a Groww equity/stocks export."
+            "Could not find a header row with ISIN and Quantity columns. "
+            "Please upload a Groww Holdings Statement export."
         )
 
-    headers = [str(ws.cell(header_row_idx, j).value or '').strip()
-               for j in range(1, ws.max_column + 1)]
+    headers = [str(v).strip().lower() if v is not None else '' for v in rows[header_idx]]
 
-    def find_col(candidates):
-        """Return 0-based index of first header matching any candidate string."""
-        for c in candidates:
-            for i, h in enumerate(headers):
-                if h and c.lower() in h.lower():
-                    return i
+    def col_of(*candidates):
+        for cand in candidates:
+            for j, h in enumerate(headers):
+                if h and cand in h:
+                    return j
         return None
 
-    symbol_col   = find_col(['symbol', 'script', 'ticker', 'nse symbol'])
-    name_col     = find_col(['company', 'name', 'stock name', 'scrip'])
-    qty_col      = find_col(['quantity', 'qty', 'shares', 'no. of shares'])
-    avg_col      = find_col(['average price', 'avg price', 'avg. price',
-                              'buy price', 'average cost', 'avg cost'])
-    ltp_col      = find_col(['ltp', 'cmp', 'current price', 'last price', 'market price'])
-    curr_val_col = find_col(['current value', 'market value', 'present value'])
-    invested_col = find_col(['invested', 'buy value', 'cost value', 'investment'])
-    pnl_col      = find_col(['p&l', 'profit', 'gain', 'unrealised'])
-    pnl_pct_col  = find_col(['return%', 'return %', 'p&l%', 'gain%', '% return'])
+    name_col     = col_of('stock name', 'company', 'name', 'scrip')
+    isin_col     = col_of('isin')
+    qty_col      = col_of('quantity', 'qty')
+    avg_col      = col_of('average buy price', 'avg price', 'average price', 'buy price')
+    invested_col = col_of('buy value', 'invested', 'cost value')
+    ltp_col      = col_of('closing price', 'ltp', 'cmp', 'current price')
+    curr_val_col = col_of('closing value', 'current value', 'market value')
+    pnl_col      = col_of('unrealised', 'p&l', 'profit', 'gain')
 
-    if symbol_col is None or qty_col is None:
+    if isin_col is None or qty_col is None:
         raise ValueError(
-            "Could not find Symbol or Quantity columns. "
+            "Could not find required columns (ISIN, Quantity). "
             "Please check this is a Groww equity holdings export."
         )
 
-    def to_float(v, default=0.0):
+    def to_float(v):
         if v is None:
-            return default
+            return None
         if isinstance(v, (int, float)):
             return float(v)
         s = str(v).replace(',', '').replace('₹', '').replace('%', '').strip()
         try:
             return float(s)
         except ValueError:
-            return default
+            return None
 
+    today = date.today().isoformat()
     stocks = []
-    for i in range(header_row_idx + 1, ws.max_row + 1):
-        row = [ws.cell(i, j).value for j in range(1, ws.max_column + 1)]
-        symbol = str(row[symbol_col] if row[symbol_col] else '').strip().upper()
-        if not symbol or symbol in ('SYMBOL', 'TOTAL', 'GRAND TOTAL', ''):
+
+    for row in rows[header_idx + 1:]:
+        if not any(v is not None for v in row):
+            continue
+
+        isin = str(row[isin_col] or '').strip().upper()
+        if not isin or not isin.startswith('IN') or len(isin) != 12:
             continue
 
         qty = to_float(row[qty_col] if qty_col is not None else None)
-        if qty <= 0:
+        if not qty or qty <= 0:
             continue
 
-        stock = {
-            "symbol":               symbol,
-            "company_name":         str(row[name_col] if name_col is not None and row[name_col] else symbol).strip(),
+        name      = str(row[name_col] or '').strip() if name_col is not None else isin
+        avg_cost  = to_float(row[avg_col]      if avg_col is not None else None)
+        invested  = to_float(row[invested_col] if invested_col is not None else None)
+        ltp       = to_float(row[ltp_col]      if ltp_col is not None else None)
+        curr_val  = to_float(row[curr_val_col] if curr_val_col is not None else None)
+        pnl       = to_float(row[pnl_col]      if pnl_col is not None else None)
+
+        # avg_cost = 0 means Groww doesn't know the buy price (demat transfer etc.)
+        if avg_cost == 0.0:
+            avg_cost = None
+        if invested == 0.0:
+            invested = None
+
+        pnl_pct = None
+        if pnl is not None and invested:
+            pnl_pct = round(pnl / invested * 100, 2)
+
+        stocks.append({
+            "isin":                 isin,
+            "symbol":               None,     # resolved later via Yahoo Finance
+            "company_name":         name,
             "qty":                  qty,
-            "avg_cost":             to_float(row[avg_col] if avg_col is not None else None),
-            "groww_ltp":            to_float(row[ltp_col] if ltp_col is not None else None),
-            "groww_current_value":  to_float(row[curr_val_col] if curr_val_col is not None else None),
-            "groww_invested":       to_float(row[invested_col] if invested_col is not None else None),
-            "groww_pnl":            to_float(row[pnl_col] if pnl_col is not None else None),
-            "groww_pnl_pct":        to_float(row[pnl_pct_col] if pnl_pct_col is not None else None),
+            "avg_cost":             avg_cost,
+            "groww_ltp":            ltp,
+            "groww_current_value":  curr_val,
+            "groww_invested":       invested,
+            "groww_pnl":            pnl,
+            "groww_pnl_pct":        pnl_pct,
             "import_source":        "groww_stocks_excel",
-            "groww_last_import":    date.today().isoformat(),
-        }
-        stocks.append(stock)
+            "groww_last_import":    today,
+        })
 
     return stocks
 
@@ -1088,21 +1128,50 @@ def api_import_groww_stocks():
     if not parsed:
         return jsonify({"error": "No stock data found in the file"}), 400
 
+    # Resolve ISINs → NSE symbols in parallel (needed for yfinance live prices)
+    isins_to_resolve = [s["isin"] for s in parsed if s.get("symbol") is None]
+    isin_symbol_map  = {}
+    if isins_to_resolve:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = {ex.submit(_resolve_isin_to_symbol, isin): isin for isin in isins_to_resolve}
+            for fut in as_completed(futures):
+                isin = futures[fut]
+                try:
+                    sym = fut.result()
+                    if sym:
+                        isin_symbol_map[isin] = sym
+                except Exception:
+                    pass
+
+    for stock in parsed:
+        if stock.get("symbol") is None:
+            stock["symbol"] = isin_symbol_map.get(stock["isin"]) or stock["isin"]
+
     stocks = load_stocks()
-    symbol_index = {s.get("symbol", "").upper(): i for i, s in enumerate(stocks)}
+    # Build lookup indexes
+    isin_index   = {s.get("isin", "").upper(): i for i, s in enumerate(stocks) if s.get("isin")}
+    symbol_index = {s.get("symbol", "").upper(): i for i, s in enumerate(stocks) if s.get("symbol")}
     existing_ids = {int(s.get("id", 0)) for s in stocks if str(s.get("id", "")).isdigit()}
     next_id = max(existing_ids, default=0) + 1
     added = updated = 0
 
     for stock in parsed:
-        sym = stock["symbol"].upper()
-        if sym in symbol_index:
-            idx = symbol_index[sym]
+        isin = stock.get("isin", "").upper()
+        sym  = (stock.get("symbol") or "").upper()
+
+        # Match by ISIN first, then fall back to symbol
+        idx = isin_index.get(isin) if isin else None
+        if idx is None and sym:
+            idx = symbol_index.get(sym)
+
+        if idx is not None:
             stocks[idx] = {
                 **stocks[idx],
+                "isin":                 stock.get("isin"),
+                "symbol":               stock.get("symbol") or stocks[idx].get("symbol"),
                 "qty":                  stock["qty"],
                 "avg_cost":             stock["avg_cost"],
-                "company_name":         stock.get("company_name", stocks[idx].get("company_name", sym)),
+                "company_name":         stock.get("company_name") or stocks[idx].get("company_name"),
                 "groww_ltp":            stock.get("groww_ltp"),
                 "groww_current_value":  stock.get("groww_current_value"),
                 "groww_invested":       stock.get("groww_invested"),
@@ -1111,12 +1180,20 @@ def api_import_groww_stocks():
                 "groww_last_import":    stock["groww_last_import"],
                 "import_source":        "groww_stocks_excel",
             }
+            # Update indexes with any newly resolved info
+            if stock.get("isin"):
+                isin_index[stock["isin"].upper()] = idx
+            if stock.get("symbol"):
+                symbol_index[stock["symbol"].upper()] = idx
             updated += 1
         else:
             stock["id"]         = str(next_id)
             stock["created_at"] = datetime.now().isoformat()
             stocks.append(stock)
-            symbol_index[sym]   = len(stocks) - 1
+            if isin:
+                isin_index[isin] = len(stocks) - 1
+            if sym:
+                symbol_index[sym] = len(stocks) - 1
             next_id += 1
             added += 1
 
