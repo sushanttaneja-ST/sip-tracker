@@ -1348,10 +1348,27 @@ def api_stocks_dashboard():
         rec = stock_recommend(stock, pd_)
         results.append({**stock, "price_data": pd_, "recommendation": rec})
 
-    valid          = [r for r in results if r["recommendation"]["invested"] > 0]
-    total_invested = sum(r["recommendation"]["invested"]      for r in valid)
-    total_current  = sum(r["recommendation"]["current_value"] for r in valid)
-    total_pnl      = total_current - total_invested
+    total_invested = 0.0
+    total_current  = 0.0
+    total_pnl      = 0.0
+
+    for r in results:
+        rec = r["recommendation"]
+        inv = rec.get("invested") or 0
+
+        # Current value: prefer live NSE price, fall back to Groww closing value
+        live_curr = rec.get("current_value") or 0
+        curr = live_curr if live_curr > 0 else (r.get("groww_current_value") or 0)
+
+        total_current  += curr
+        total_invested += inv
+
+        # P&L: use calculated P&L where cost basis known, else Groww's own P&L
+        if inv > 0:
+            total_pnl += rec.get("pnl_abs") or 0
+        else:
+            total_pnl += r.get("groww_pnl") or 0
+
     overall_return = (total_pnl / total_invested * 100) if total_invested else 0
 
     status_counts = {}
