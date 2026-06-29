@@ -84,10 +84,9 @@ body {
   display: flex; align-items: center;
 }
 .sidebar-brand .collapse-btn:hover { background: rgba(255,255,255,.1); color: #e6edf3; }
-.sidebar.collapsed .brand-text,
-.sidebar.collapsed .collapse-btn { display: none; }
-/* Show a mini collapse toggle when collapsed */
+.sidebar.collapsed .brand-text { display: none; }
 .sidebar.collapsed .sidebar-brand { justify-content: center; }
+.sidebar.collapsed .collapse-btn { margin-left: 0; }
 
 /* Nav */
 .sidebar-nav {
@@ -120,20 +119,35 @@ body {
 .sidebar.collapsed .sidebar-link.active { border-right-color: var(--blue); background: rgba(31,111,235,.12); }
 .sidebar.collapsed .sidebar-link span { display: none; }
 
-/* Section label */
-.sidebar-section {
-  padding: .5rem 1.1rem .2rem;
+/* Accordion section groups */
+.sidebar-group { overflow: hidden; }
+.sidebar-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .55rem 1.1rem .3rem;
   font-size: .7rem;
   font-weight: 600;
   letter-spacing: .08em;
-  color: rgba(139,148,158,.6);
+  color: rgba(139,148,158,.55);
   text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
   white-space: nowrap;
 }
-.sidebar.collapsed .sidebar-section { display: none; }
+.sidebar-group-header:hover { color: rgba(139,148,158,.9); }
+.sidebar-group-chevron { font-size: .7rem; transition: transform .2s ease; flex-shrink: 0; }
+.sidebar-group.collapsed .sidebar-group-chevron { transform: rotate(-90deg); }
+.sidebar-group-items {
+  max-height: 300px;
+  overflow: hidden;
+  transition: max-height .25s ease;
+}
+.sidebar-group.collapsed .sidebar-group-items { max-height: 0; }
+.sidebar.collapsed .sidebar-group-header { display: none; }
 
 /* Sidebar divider */
-.sidebar-divider { border-color: rgba(255,255,255,.08); margin: .4rem .8rem; }
+.sidebar-divider { border-color: rgba(255,255,255,.08); margin: .3rem .8rem; }
 
 /* Footer */
 .sidebar-footer {
@@ -399,21 +413,37 @@ body.privacy-mode .private-val {
 
   <!-- Nav -->
   <nav class="sidebar-nav" id="sidebarNav">
-    <div class="sidebar-section">Portfolio</div>
-    <a class="sidebar-link active" data-target="mfPane" data-title="Mutual Funds" onclick="switchPane(this)">
-      <i class="bi bi-graph-up-arrow"></i><span>Mutual Funds</span>
-    </a>
-    <a class="sidebar-link" data-target="stocksPane" data-title="Stocks" onclick="switchPane(this)">
-      <i class="bi bi-bar-chart-line"></i><span>Stocks</span>
-    </a>
+    <!-- Portfolio group -->
+    <div class="sidebar-group" id="grp-portfolio">
+      <div class="sidebar-group-header" onclick="toggleGroup('grp-portfolio')">
+        <span>Portfolio</span>
+        <i class="bi bi-chevron-down sidebar-group-chevron"></i>
+      </div>
+      <div class="sidebar-group-items">
+        <a class="sidebar-link active" data-target="mfPane" data-title="Mutual Funds" onclick="switchPane(this)">
+          <i class="bi bi-graph-up-arrow"></i><span>Mutual Funds</span>
+        </a>
+        <a class="sidebar-link" data-target="stocksPane" data-title="Stocks" onclick="switchPane(this)">
+          <i class="bi bi-bar-chart-line"></i><span>Stocks</span>
+        </a>
+      </div>
+    </div>
     <hr class="sidebar-divider">
-    <div class="sidebar-section">Reports</div>
-    <a class="sidebar-link" data-target="taxPane" data-title="Tax Report" onclick="switchPane(this)">
-      <i class="bi bi-receipt"></i><span>Tax Report</span>
-    </a>
-    <a class="sidebar-link" data-target="historyPane" data-title="History" onclick="switchPane(this)">
-      <i class="bi bi-clock-history"></i><span>History</span>
-    </a>
+    <!-- Reports group -->
+    <div class="sidebar-group" id="grp-reports">
+      <div class="sidebar-group-header" onclick="toggleGroup('grp-reports')">
+        <span>Reports</span>
+        <i class="bi bi-chevron-down sidebar-group-chevron"></i>
+      </div>
+      <div class="sidebar-group-items">
+        <a class="sidebar-link" data-target="taxPane" data-title="Tax Report" onclick="switchPane(this)">
+          <i class="bi bi-receipt"></i><span>Tax Report</span>
+        </a>
+        <a class="sidebar-link" data-target="historyPane" data-title="History" onclick="switchPane(this)">
+          <i class="bi bi-clock-history"></i><span>History</span>
+        </a>
+      </div>
+    </div>
   </nav>
 
   <!-- Footer -->
@@ -710,15 +740,6 @@ body.privacy-mode .private-val {
         <div class="mt-2 small" id="stk-niftyReturn">—</div>
         <div class="mt-1 small" id="stk-vsNifty"></div>
       </div>
-    </div>
-  </div>
-
-  <!-- Feature 1: Sector Allocation chart -->
-  <div class="chart-card mb-4" id="sectorChartSection" style="display:none">
-    <div class="fw-semibold mb-3">Sector Allocation</div>
-    <div class="row align-items-center">
-      <div class="col-md-5"><canvas id="sectorChart" height="240"></canvas></div>
-      <div class="col-md-7" id="sectorLegend"></div>
     </div>
   </div>
 
@@ -1033,7 +1054,6 @@ let stocksLoaded      = false;
 let searchTimer       = null;
 let allocationChart   = null;
 let xirrChart         = null;
-let sectorChart       = null;
 let historyChart      = null;
 let pendingDeleteId   = null;
 let pendingDeleteType = null;
@@ -1187,7 +1207,6 @@ async function loadStocksInBackground() {
     if (activeTab === 'stocks') {
       renderStocksSummary(data.summary);
       renderStocks(allStocks);
-      renderSectorChart(allStocks);
       checkStkImportBanner(allStocks);
       document.getElementById('stk-lastUpdated').textContent = 'Updated ' + data.summary.last_updated;
       document.getElementById('stk-sortBar').style.display = '';
@@ -1785,69 +1804,6 @@ function sortStocks(field) {
   renderStocks(sorted);
 }
 
-// ── Feature 1: Sector Allocation Chart ──────────────────────────────────────
-function renderSectorChart(stocks) {
-  const section = document.getElementById('sectorChartSection');
-  if (!stocks || !stocks.length) { section.style.display = 'none'; return; }
-
-  // Aggregate by sector
-  const sectors = {};
-  for (const s of stocks) {
-    const sector = (s.sector || 'Other').trim() || 'Other';
-    const val = s.groww_current_value || (s.recommendation && s.recommendation.current_value) || 0;
-    sectors[sector] = (sectors[sector] || 0) + val;
-  }
-
-  const entries = Object.entries(sectors).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
-  if (!entries.length) { section.style.display = 'none'; return; }
-
-  section.style.display = '';
-
-  const labels = entries.map(([k]) => k);
-  const values = entries.map(([,v]) => v);
-  const total  = values.reduce((a,b) => a+b, 0);
-  const colors = CHART_COLORS.slice(0, entries.length);
-
-  const ctx = document.getElementById('sectorChart').getContext('2d');
-  if (sectorChart) sectorChart.destroy();
-  sectorChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        backgroundColor: colors,
-        borderColor: '#0d0f14',
-        borderWidth: 3,
-        hoverOffset: 8,
-      }]
-    },
-    options: {
-      cutout: '60%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => {
-          const v = ctx.parsed;
-          return ` ${fmt(v)} (${(v/total*100).toFixed(1)}%)`;
-        }}}
-      }
-    }
-  });
-
-  // Custom legend
-  document.getElementById('sectorLegend').innerHTML = entries.map(([name, val], i) => `
-    <div class="d-flex align-items-center justify-content-between mb-2" style="font-size:.82rem">
-      <div class="d-flex align-items-center gap-2">
-        <div style="width:10px;height:10px;border-radius:50%;background:${colors[i]};flex-shrink:0"></div>
-        <span>${escHtml(name)}</span>
-      </div>
-      <div class="text-end">
-        <span class="fw-semibold">${fmt(val)}</span>
-        <span class="text-muted ms-2" style="font-size:.75rem">${(val/total*100).toFixed(1)}%</span>
-      </div>
-    </div>`).join('');
-}
-
 // ── Feature 6: Tax Report ───────────────────────────────────────────────────
 function renderTaxReport(tax) {
   if (!tax) return;
@@ -2240,7 +2196,14 @@ function toggleSidebar() {
   const sb = document.getElementById('sidebar');
   const collapsed = sb.classList.toggle('collapsed');
   localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+  const icon = document.querySelector('#sidebarCollapseBtn i');
+  if (icon) icon.className = collapsed ? 'bi bi-layout-sidebar' : 'bi bi-layout-sidebar-reverse';
   updateMainWrapperMargin();
+}
+
+// ── Accordion groups ──────────────────────────────────────────────────────────
+function toggleGroup(id) {
+  document.getElementById(id).classList.toggle('collapsed');
 }
 function updateMainWrapperMargin() {
   const sb = document.getElementById('sidebar');
