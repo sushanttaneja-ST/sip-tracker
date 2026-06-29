@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SIP Tracker — Sign In</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
+<style>
+  body {
+    background: #0d0f14;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  .login-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+  }
+  .brand-icon { font-size: 2.8rem; margin-bottom: .5rem; }
+  .brand-title { font-size: 1.4rem; font-weight: 700; color: #e6edf3; margin-bottom: .25rem; }
+  .brand-sub { color: #8b949e; font-size: .875rem; margin-bottom: 2rem; }
+  .btn-google {
+    display: flex; align-items: center; justify-content: center; gap: .75rem;
+    background: #fff; color: #1f1f1f; border: none; border-radius: 8px;
+    padding: .75rem 1.25rem; font-size: .95rem; font-weight: 500;
+    width: 100%; cursor: pointer; transition: background .15s, box-shadow .15s;
+    text-decoration: none;
+  }
+  .btn-google:hover { background: #f1f3f4; box-shadow: 0 2px 8px rgba(0,0,0,.3); color: #1f1f1f; }
+  .btn-google svg { flex-shrink: 0; }
+  .divider { border-color: #30363d; opacity: 1; margin: 1.75rem 0; }
+  .setup-box {
+    background: #1c2230; border: 1px solid #30363d; border-radius: 10px;
+    padding: 1.25rem; text-align: left; font-size: .82rem; color: #8b949e;
+  }
+  .setup-box h6 { color: #e3a008; font-size: .85rem; margin-bottom: .75rem; }
+  .setup-box ol { padding-left: 1.2rem; margin: 0; }
+  .setup-box li { margin-bottom: .4rem; line-height: 1.5; }
+  .setup-box code {
+    background: #0d0f14; color: #79c0ff; padding: .1rem .35rem;
+    border-radius: 4px; font-size: .78rem;
+  }
+  .error-box {
+    background: rgba(218,54,51,.15); border: 1px solid rgba(218,54,51,.3);
+    border-radius: 8px; padding: .75rem 1rem; color: #f85149;
+    font-size: .85rem; margin-bottom: 1.25rem;
+  }
+  .privacy-note { font-size: .75rem; color: #4d5562; margin-top: 1.5rem; }
+</style>
+</head>
+<body>
+<div class="login-card">
+
+  <div class="brand-icon">📈</div>
+  <div class="brand-title">SIP Tracker</div>
+  <div class="brand-sub">Your personal Groww MF dashboard</div>
+
+  {% if error %}
+  <div class="error-box">{{ error }}</div>
+  {% endif %}
+
+  {% if setup_needed %}
+  <!-- OAuth not configured yet -->
+  <div class="setup-box">
+    <h6>⚙️ One-time Google setup needed</h6>
+    <ol>
+      <li>Go to <strong>console.cloud.google.com</strong></li>
+      <li>Create a project → <em>APIs & Services → Credentials</em></li>
+      <li>Click <strong>Create Credentials → OAuth 2.0 Client ID</strong><br/>
+          Application type: <em>Web application</em></li>
+      <li>Add Authorised redirect URI:<br/>
+          <code>http://localhost:5001/auth/callback</code></li>
+      <li>Copy <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+      <li>Open the file <code>.env</code> in the project folder and paste them</li>
+      <li>Restart the server (<code>python3 app.py</code>)</li>
+    </ol>
+  </div>
+  <hr class="divider"/>
+  <a href="/" class="btn-google" style="background:#1f6feb;color:#fff;border-radius:8px;justify-content:center">
+    Continue without SSO (local only)
+  </a>
+
+  {% else %}
+  <!-- Show Google Sign-In button -->
+  <a href="/auth/google" class="btn-google">
+    <svg width="20" height="20" viewBox="0 0 48 48">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      <path fill="none" d="M0 0h48v48H0z"/>
+    </svg>
+    Sign in with Google
+  </a>
+
+  <div class="privacy-note">
+    Access restricted to authorised Google accounts only.
+  </div>
+  {% endif %}
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Secrets
+.env
+
+# All portfolio data (private)
+data/
+
+# Cached NAV / stock prices
+cache/
+
+# Claude Code internal files
+memory/
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
