@@ -1399,105 +1399,230 @@ def api_stocks_dashboard():
 
 
 # ---------------------------------------------------------------------------
-# IPO Data
+# IPO Data  (BSE + NSE)
 # ---------------------------------------------------------------------------
 _ipo_cache: dict = {"data": None, "ts": 0.0}
 _IPO_TTL = 3600  # 1 hour
 
-
-def _bse_headers():
-    return {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Referer": "https://www.bseindia.com/",
-        "Origin": "https://www.bseindia.com",
-    }
+_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
 
-def _parse_bse_date(s):
-    """Parse BSE date strings like '16/01/2025' or '2025-01-16' into a date."""
+def _parse_date(s: str) -> "date | None":
+    """Parse date strings from BSE/NSE into a date object."""
     if not s:
         return None
-    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d %b %Y"):
+    s = s.strip()
+    for fmt in ("%d-%b-%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y",
+                "%d %b %Y", "%b %d, %Y", "%d-%b-%y"):
         try:
-            return datetime.strptime(s.strip(), fmt).date()
+            return datetime.strptime(s, fmt).date()
         except ValueError:
             continue
     return None
 
 
-def fetch_ipo_data():
+def _fmt_date(d: "date | None") -> str:
+    return d.strftime("%-d %b %Y") if d else "—"
+
+
+def _price_band(lo, hi) -> str:
+    lo, hi = str(lo or "").strip(), str(hi or "").strip()
+    if lo and hi and lo != hi:
+        return f"₹{lo} – ₹{hi}"
+    return f"₹{lo or hi}" if (lo or hi) else "—"
+
+
+def _issue_size(raw) -> str:
+    try:
+        return f"₹{float(str(raw).replace(',', '')):.0f} Cr"
+    except (ValueError, TypeError):
+        return str(raw or "—").strip() or "—"
+
+
+def _dedup_key(name: str) -> str:
+    """Normalise company name for deduplication across BSE/NSE."""
+    import re
+    n = name.lower()
+    for suffix in [" limited", " ltd.", " ltd", " private", " pvt.", " pvt"]:
+        n = n.replace(suffix, "")
+    return re.sub(r"\s+", " ", n).strip()
+
+
+def _classify(ipo: dict, today: "date") -> str:
+    open_d  = _parse_date(ipo.get("_open_raw"))
+    close_d = _parse_date(ipo.get("_close_raw"))
+    list_d  = _parse_date(ipo.get("_list_raw"))
+    if open_d and close_d and open_d <= today <= close_d:
+        return "open"
+    if open_d and open_d > today:
+        return "upcoming"
+    if list_d and list_d <= today:
+        ipo["listed_days_ago"] = (today - list_d).days
+        return "listed"
+    if close_d and close_d < today:
+        ipo["listed_days_ago"] = None
+        return "listed"
+    return None
+
+
+# ── BSE fetcher ───────────────────────────────────────────────────────────────
+def _fetch_bse_ipos() -> list:
+    ipos = []
+    bse_headers = {
+        "User-Agent": _UA,
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.bseindia.com/",
+        "Origin": "https://www.bseindia.com",
+    }
+    for url, cat in [
+        ("https://api.bseindia.com/BseIndiaAPI/api/IPO/w",    "Main Board"),
+        ("https://api.bseindia.com/BseIndiaAPI/api/SMEIPO/w", "SME"),
+    ]:
+        try:
+            r = requests.get(url, headers=bse_headers, timeout=10)
+            if r.status_code != 200:
+                continue
+            for row in r.json().get("Table", []):
+                name = (row.get("CompanyName") or row.get("COMPANYNAME") or "").strip()
+                if not name:
+                    continue
+                ipos.append({
+                    "name":       name,
+                    "category":   cat,
+                    "source":     "BSE",
+                    "price_band": _price_band(
+                        row.get("PriceFrom") or row.get("PRICEFROM"),
+                        row.get("PriceTo")   or row.get("PRICETO"),
+                    ),
+                    "lot_size":  str(row.get("LotSize") or row.get("LOTSIZE") or "—").strip(),
+                    "issue_size": _issue_size(row.get("IssueSize") or row.get("ISSUESIZE")),
+                    "_open_raw":  str(row.get("OpenDate")    or row.get("OPENDATE")    or ""),
+                    "_close_raw": str(row.get("CloseDate")   or row.get("CLOSEDATE")   or ""),
+                    "_list_raw":  str(row.get("ListingDate") or row.get("LISTINGDATE") or ""),
+                })
+        except Exception:
+            pass
+    return ipos
+
+
+# ── NSE fetcher ───────────────────────────────────────────────────────────────
+def _fetch_nse_ipos() -> list:
+    ipos = []
+    try:
+        sess = requests.Session()
+        sess.headers.update({
+            "User-Agent": _UA,
+            "Accept-Language": "en-US,en;q=0.9",
+        })
+        # Warm up session — NSE requires a cookie from the homepage first
+        sess.get("https://www.nseindia.com", timeout=10,
+                 headers={"Accept": "text/html,application/xhtml+xml"})
+        time.sleep(0.4)
+
+        api_headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://www.nseindia.com/market-data/ipo",
+            "X-Requested-With": "XMLHttpRequest",
+        }
+
+        for endpoint in [
+            "https://www.nseindia.com/api/ipo",
+            "https://www.nseindia.com/api/ipo-current-issue",
+        ]:
+            try:
+                r = sess.get(endpoint, headers=api_headers, timeout=10)
+                if r.status_code != 200:
+                    continue
+                payload = r.json()
+                # NSE may return a list directly or {"ipoList": [...]}
+                rows = payload if isinstance(payload, list) else (
+                    payload.get("ipoList") or payload.get("data") or []
+                )
+                for row in rows:
+                    name = (row.get("companyName") or row.get("name") or "").strip()
+                    if not name:
+                        continue
+                    lo = str(row.get("bidMinPrice") or row.get("priceMin") or row.get("ipoPrice") or "").strip()
+                    hi = str(row.get("bidMaxPrice") or row.get("priceMax") or row.get("ipoPrice") or "").strip()
+                    ipos.append({
+                        "name":       name,
+                        "category":   "Main Board",
+                        "source":     "NSE",
+                        "price_band": _price_band(lo, hi),
+                        "lot_size":   str(row.get("lotSize") or row.get("marketLot") or "—").strip(),
+                        "issue_size": _issue_size(row.get("issueSize") or row.get("issueSizeInCrore")),
+                        "_open_raw":  str(row.get("openDate")    or row.get("ipoOpenDate")    or ""),
+                        "_close_raw": str(row.get("closeDate")   or row.get("ipoCloseDate")   or ""),
+                        "_list_raw":  str(row.get("listingDate") or row.get("ipoListingDate") or ""),
+                    })
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return ipos
+
+
+# ── Main fetch + merge ────────────────────────────────────────────────────────
+def fetch_ipo_data() -> dict:
     global _ipo_cache
     if _ipo_cache["data"] and time.time() - _ipo_cache["ts"] < _IPO_TTL:
         return _ipo_cache["data"]
 
-    today = date.today()
-    result = {"open": [], "upcoming": [], "listed": [], "fetched_at": today.isoformat()}
+    today  = date.today()
+    result = {"open": [], "upcoming": [], "listed": [],
+              "fetched_at": today.isoformat(), "sources": []}
 
-    # ── BSE Mainboard ─────────────────────────────────────────────────────────
-    for url, category in [
-        ("https://api.bseindia.com/BseIndiaAPI/api/IPO/w", "Main Board"),
-        ("https://api.bseindia.com/BseIndiaAPI/api/SMEIPO/w", "SME"),
-    ]:
-        try:
-            r = requests.get(url, headers=_bse_headers(), timeout=10)
-            if r.status_code != 200:
-                continue
-            rows = r.json().get("Table", [])
-            for row in rows:
-                open_d  = _parse_bse_date(row.get("OpenDate") or row.get("OPENDATE") or "")
-                close_d = _parse_bse_date(row.get("CloseDate") or row.get("CLOSEDATE") or "")
-                list_d  = _parse_bse_date(row.get("ListingDate") or row.get("LISTINGDATE") or "")
-                name    = (row.get("CompanyName") or row.get("COMPANYNAME") or "").strip()
-                if not name:
-                    continue
+    # Collect from both exchanges in parallel
+    raw_ipos: list = []
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        futures = {
+            ex.submit(_fetch_bse_ipos): "BSE",
+            ex.submit(_fetch_nse_ipos): "NSE",
+        }
+        for fut, src in futures.items():
+            try:
+                batch = fut.result(timeout=15)
+                if batch:
+                    raw_ipos.extend(batch)
+                    result["sources"].append(src)
+            except Exception:
+                pass
 
-                price_lo = str(row.get("PriceFrom") or row.get("PRICEFROM") or "").strip()
-                price_hi = str(row.get("PriceTo")   or row.get("PRICETO")   or "").strip()
-                price_band = f"₹{price_lo}–{price_hi}" if price_lo and price_hi else (
-                    f"₹{price_lo or price_hi}" if (price_lo or price_hi) else "—"
-                )
+    # Deduplicate: keep first occurrence per normalised name
+    seen: set = set()
+    for ipo in raw_ipos:
+        key = _dedup_key(ipo["name"])
+        if key in seen:
+            continue
+        seen.add(key)
 
-                lot   = str(row.get("LotSize") or row.get("LOTSIZE") or "—").strip()
-                issue = str(row.get("IssueSize") or row.get("ISSUESIZE") or "—").strip()
-                try:
-                    issue_cr = f"₹{float(issue):.0f} Cr" if issue != "—" else "—"
-                except ValueError:
-                    issue_cr = issue
+        # Resolve dates into display strings
+        open_d  = _parse_date(ipo["_open_raw"])
+        close_d = _parse_date(ipo["_close_raw"])
+        list_d  = _parse_date(ipo["_list_raw"])
+        ipo["open_date"]  = _fmt_date(open_d)
+        ipo["close_date"] = _fmt_date(close_d)
+        ipo["list_date"]  = _fmt_date(list_d)
 
-                ipo = {
-                    "name":       name,
-                    "category":   category,
-                    "price_band": price_band,
-                    "lot_size":   lot,
-                    "issue_size": issue_cr,
-                    "open_date":  open_d.strftime("%-d %b %Y")  if open_d  else "—",
-                    "close_date": close_d.strftime("%-d %b %Y") if close_d else "—",
-                    "list_date":  list_d.strftime("%-d %b %Y")  if list_d  else "—",
-                }
+        bucket = _classify(ipo, today)
+        if bucket:
+            result[bucket].append(ipo)
 
-                if open_d and close_d and open_d <= today <= close_d:
-                    result["open"].append(ipo)
-                elif open_d and open_d > today:
-                    result["upcoming"].append(ipo)
-                elif list_d and list_d <= today:
-                    ipo["listed_days_ago"] = (today - list_d).days
-                    result["listed"].append(ipo)
-                elif close_d and close_d < today and not list_d:
-                    ipo["listed_days_ago"] = None
-                    result["listed"].append(ipo)
-        except Exception:
-            pass
-
-    # Sort upcoming by open_date asc, listed by recent first
-    def _sort_key_date(ipo, field):
+    def _sort_key(ipo, field):
         try:
             return datetime.strptime(ipo[field], "%-d %b %Y").date()
         except Exception:
             return date.max
 
-    result["upcoming"].sort(key=lambda x: _sort_key_date(x, "open_date"))
-    result["listed"].sort(key=lambda x: x.get("listed_days_ago") or 999)
+    result["upcoming"].sort(key=lambda x: _sort_key(x, "open_date"))
+    result["listed"].sort(key=lambda x: (x.get("listed_days_ago") is None, x.get("listed_days_ago") or 999))
+
+    # Strip internal keys before returning
+    for bucket in ("open", "upcoming", "listed"):
+        for ipo in result[bucket]:
+            ipo.pop("_open_raw",  None)
+            ipo.pop("_close_raw", None)
+            ipo.pop("_list_raw",  None)
 
     _ipo_cache = {"data": result, "ts": time.time()}
     return result
