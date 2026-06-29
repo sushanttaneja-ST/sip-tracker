@@ -1499,12 +1499,13 @@ function renderStocksSummary(s) {
 
   // Feature 5: Nifty 50 benchmark card
   if (s.nifty) {
-    document.getElementById('stk-niftyLevel').textContent = '₹' + s.nifty.current.toLocaleString('en-IN');
+    document.getElementById('stk-niftyLevel').textContent =
+      s.nifty.current.toLocaleString('en-IN', {maximumFractionDigits: 0}) + ' pts';
     const nr = s.nifty.return_1y;
     document.getElementById('stk-niftyReturn').innerHTML =
-      `1Y: <span class="${nr>=0?'text-green':'text-red'}">${nr>=0?'+':''}${nr}%</span>`;
+      `1Y return: <span class="${nr>=0?'text-green':'text-red'}">${nr>=0?'+':''}${nr}%</span>`;
     const portReturn = s.overall_return_pct || 0;
-    const diff = (portReturn - nr).toFixed(1);
+    const diff = parseFloat((portReturn - nr).toFixed(1));
     document.getElementById('stk-vsNifty').innerHTML = diff >= 0
       ? `<span class="text-green">▲ Beating Nifty by ${diff}%</span>`
       : `<span class="text-red">▼ Lagging Nifty by ${Math.abs(diff)}%</span>`;
